@@ -1,0 +1,36 @@
+{
+  "name": "oblík-zakupivel",
+  "version": "2.0.0",
+  "description": "PWA додаток для обліку закупівель, розвантаження та доставки товарів",
+  "main": "app.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "pwa",
+    "закупівлі",
+    "inventory",
+    "ukraine"
+  ],
+  "author": "AI Assistant",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^25.0.3",
+    "jsdom": "^24.0.0",
+    "serve": "^14.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^1.4.0"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
