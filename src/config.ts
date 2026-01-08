@@ -2,8 +2,12 @@
 // Provides the SecureConfig class and a shared singleton instance
 
 class SecureConfig {
+    public mode: 'test' | 'production';
+    public N8N_WEBHOOK_URL: string;
+    public GEMINI_API_URL: string | null;
+
     constructor() {
-        this.mode = this.getInitialMode();
+        this.mode = this.getInitialMode() as 'test' | 'production';
         this.N8N_WEBHOOK_URL = this.resolveWebhookUrl();
         // AI прямий доступ вимкнено; розпізнавання здійснюється через n8n
         this.GEMINI_API_URL = null;
@@ -33,7 +37,7 @@ class SecureConfig {
         return this.isTestMode ? this.testWebhookUrl : this.productionProxyUrl;
     }
 
-    setMode(mode) {
+    setMode(mode: 'test' | 'production') {
         const normalized = mode === 'test' ? 'test' : 'production';
         this.mode = normalized;
 
@@ -106,7 +110,7 @@ class SecureConfig {
     }
 
     get productionWebhookUrl() {
-        return 'https://n8n.dmytrotovstytskyi.online/webhook/deliverygb';
+        return 'https://n8n.dmytrotovstytskyi.online/webhook/gbdelivery2';
     }
 
     get productionProxyUrl() {
@@ -114,7 +118,7 @@ class SecureConfig {
     }
 
     get testWebhookUrl() {
-        return 'https://n8n.dmytrotovstytskyi.online/webhook-test/deliverygb';
+        return 'https://n8n.dmytrotovstytskyi.online/webhook-test/gbdelivery2';
     }
 
     get receiptProductionWebhookUrl() {
@@ -151,7 +155,7 @@ class SecureConfig {
         ];
     }
 
-    isWarehouseProduct(productName) {
+    isWarehouseProduct(productName: string) {
         return this.warehouseProducts.includes(productName);
     }
 }
