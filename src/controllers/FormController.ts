@@ -1,3 +1,4 @@
+import { config } from '../config.js';
 import { AppState, PurchaseDraftManager, DraftManager, InventoryManager, SecureStorageManager } from '../state.js';
 import { ToastManager, AppUIAdapter } from '../ui.js';
 
@@ -143,6 +144,8 @@ export class FormController {
         const locationLabel = document.getElementById('locationLabel');
         const locationSelect = document.getElementById('location') as HTMLSelectElement;
 
+        this.populateDropdowns();
+
         if (priceGroup) priceGroup.style.display = isUnloading ? 'none' : 'block';
         if (totalGroup) totalGroup.style.display = isUnloading ? 'none' : 'block';
 
@@ -166,6 +169,67 @@ export class FormController {
         }
 
         this.updateTotalAmount();
+    }
+
+    populateDropdowns() {
+        // Populate Units
+        const unitSelect = document.getElementById('unit') as HTMLSelectElement;
+        if (unitSelect && unitSelect.options.length === 0) {
+            config.units.forEach(u => {
+                const option = document.createElement('option');
+                option.value = u.value;
+                option.textContent = u.label;
+                unitSelect.appendChild(option);
+            });
+        }
+
+        // Populate Products
+        const productSuggestions = document.getElementById('productSuggestions');
+        if (productSuggestions && productSuggestions.children.length === 0) {
+            const allProducts = [...config.products, ...config.warehouseProducts];
+            const uniqueProducts = Array.from(new Set(allProducts)).sort();
+
+            uniqueProducts.forEach(prod => {
+                const option = document.createElement('option');
+                option.value = prod;
+                productSuggestions.appendChild(option);
+            });
+        }
+
+        // Populate Locations
+        const locationSelect = document.getElementById('location') as HTMLSelectElement;
+        if (locationSelect) {
+            locationSelect.innerHTML = '';
+
+            let locations: string[] = [];
+            if (this.appState.isUnloading) {
+                locations = config.unloadingLocations;
+            } else if (this.appState.isDelivery) {
+                locations = config.deliveryLocations;
+            } else {
+                locations = config.marketLocations;
+            }
+
+            // Додаємо опцію за замовчуванням
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Оберіть...';
+            defaultOption.disabled = true;
+            defaultOption.selected = true;
+            locationSelect.appendChild(defaultOption);
+
+            locations.forEach(loc => {
+                const option = document.createElement('option');
+                option.value = loc;
+                option.textContent = loc;
+                locationSelect.appendChild(option);
+            });
+
+            // Відновлюємо вибір, якщо є редагування
+            if (this.appState.selectedStore) {
+                locationSelect.value = this.appState.selectedStore;
+            }
+        }
     }
 
     async handleFormSubmit(event: Event) {
