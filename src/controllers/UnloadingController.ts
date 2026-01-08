@@ -1,7 +1,18 @@
+import { AppState, DraftManager, SecureStorageManager, InventoryManager } from '../state.js';
+import { ToastManager, AppUIAdapter, SkeletonLoader, AnimationManager } from '../ui.js';
+import { ABTestManager } from '../ab-testing.js';
+import { SecureApiClient } from '../network.js';
+import { config } from '../config.js';
+
 export class UnloadingController {
-    constructor(appState, appUI, toastManager, abTestManager) {
+    private appState: AppState;
+    // private appUI: AppUIAdapter; // Unused
+    private toastManager: ToastManager;
+    private abTestManager: ABTestManager;
+
+    constructor(appState: AppState, _appUI: AppUIAdapter, toastManager: ToastManager, abTestManager: ABTestManager) {
         this.appState = appState;
-        this.appUI = appUI;
+        // this.appUI = appUI;
         this.toastManager = toastManager;
         this.abTestManager = abTestManager;
     }
@@ -17,47 +28,43 @@ export class UnloadingController {
         if (!grid) return;
 
         grid.innerHTML = '';
-        // Note: config should be imported
-        import('../config.js').then(({ config }) => {
-            const stores = config.unloadingLocations.filter(loc => loc !== 'Інше');
+        const stores = config.unloadingLocations.filter(loc => loc !== 'Інше');
 
-            stores.forEach(store => {
-                const card = document.createElement('button');
-                card.type = 'button';
-                card.className = 'store-card glassmorphism';
-                card.setAttribute('data-store', store);
+        stores.forEach(store => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'store-card glassmorphism';
+            card.setAttribute('data-store', store);
 
-                const icon = document.createElement('i');
-                icon.setAttribute('data-lucide', 'store');
-                icon.className = 'store-icon';
+            const icon = document.createElement('i');
+            icon.setAttribute('data-lucide', 'store');
+            icon.className = 'store-icon';
 
-                const label = document.createElement('span');
-                label.className = 'store-label';
-                label.textContent = store;
+            const label = document.createElement('span');
+            label.className = 'store-label';
+            label.textContent = store;
 
-                card.appendChild(icon);
-                card.appendChild(label);
-                card.onclick = async () => await this.selectStore(store);
+            card.appendChild(icon);
+            card.appendChild(label);
+            card.onclick = async () => await this.selectStore(store);
 
-                grid.appendChild(card);
-            });
-
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
+            grid.appendChild(card);
         });
+
+        if (typeof (window as any).lucide !== 'undefined') {
+            (window as any).lucide.createIcons();
+        }
     }
 
-    async selectStore(storeName) {
+    async selectStore(storeName: string) {
         this.appState.selectedStore = storeName;
-        const { DraftManager } = await import('../state.js');
         const draft = await DraftManager.getDraft(storeName);
 
         if (draft.items.length > 0) {
             await this.showDraftView(storeName);
         } else {
             this.appState.setScreen('purchase-form');
-            if (window.setupPurchaseForm) window.setupPurchaseForm();
+            if ((window as any).setupPurchaseForm) (window as any).setupPurchaseForm();
         }
     }
 
@@ -72,12 +79,9 @@ export class UnloadingController {
         const useOptimizedRender = variant === 'variantB';
 
         emptyState.style.display = 'none';
-        if (window.SkeletonLoader) {
-            window.SkeletonLoader.showDraftsSkeleton(container, 3);
-        }
+        SkeletonLoader.showDraftsSkeleton(container, 3);
         summary.textContent = 'Завантаження...';
 
-        const { DraftManager } = await import('../state.js');
         const drafts = await DraftManager.getAllDraftsArray();
 
         this.abTestManager.trackEvent('list-optimization', 'list-rendered', {
@@ -99,16 +103,16 @@ export class UnloadingController {
 
         if (useOptimizedRender && drafts.length > 10) {
             try {
-                const { OptimizedDraftsRenderer } = await import('../optimized-list.js');
+                const { OptimizedDraftsRenderer } = await import('../optimized-list.ts');
                 const renderer = new OptimizedDraftsRenderer(container, { pageSize: 10 });
 
                 const rendererData = drafts.map(draft => ({
                     ...draft,
-                    onView: (e) => {
+                    onView: (e: Event) => {
                         e.stopPropagation();
                         this.showDraftView(draft.storeName);
                     },
-                    onDelete: (e) => {
+                    onDelete: (e: Event) => {
                         e.stopPropagation();
                         this.deleteDraft(draft.storeName);
                     }
@@ -130,15 +134,13 @@ export class UnloadingController {
         });
 
         container.appendChild(fragment);
-        if (window.AnimationManager) {
-            window.AnimationManager.animateListItems(container);
-        }
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
+        AnimationManager.animateListItems(container);
+        if (typeof (window as any).lucide !== 'undefined') {
+            (window as any).lucide.createIcons();
         }
     }
 
-    createDraftCard(draft) {
+    createDraftCard(draft: any) {
         const card = document.createElement('div');
         card.className = 'draft-card glassmorphism';
 
@@ -187,7 +189,7 @@ export class UnloadingController {
         return card;
     }
 
-    async showDraftView(storeName) {
+    async showDraftView(storeName: string) {
         this.appState.selectedStore = storeName;
         this.appState.setScreen('draft-view');
 
@@ -195,7 +197,7 @@ export class UnloadingController {
         const summary = document.getElementById('draftViewSummary');
         const container = document.getElementById('draftItems');
         const emptyState = document.getElementById('draftItemsEmpty');
-        const submitBtn = document.getElementById('submitDraftBtn');
+        const submitBtn = document.getElementById('submitDraftBtn') as HTMLButtonElement;
         const submitBtnText = document.getElementById('submitDraftBtnText');
 
         if (!title || !summary || !container || !emptyState) return;
@@ -203,12 +205,9 @@ export class UnloadingController {
         title.textContent = storeName;
 
         emptyState.style.display = 'none';
-        if (window.SkeletonLoader) {
-            window.SkeletonLoader.showDraftItemsSkeleton(container, 5);
-        }
+        SkeletonLoader.showDraftItemsSkeleton(container, 5);
         summary.textContent = 'Завантаження...';
 
-        const { DraftManager } = await import('../state.js');
         const draft = await DraftManager.getDraft(storeName);
 
         const itemCount = draft.items.length;
@@ -229,19 +228,17 @@ export class UnloadingController {
         container.style.display = 'flex';
 
         const fragment = document.createDocumentFragment();
-        draft.items.forEach(item => {
+        draft.items.forEach((item: any) => {
             const itemDiv = this.createDraftItemElement(storeName, item);
             fragment.appendChild(itemDiv);
         });
 
         container.appendChild(fragment);
-        if (window.AnimationManager) {
-            window.AnimationManager.animateListItems(container);
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        AnimationManager.animateListItems(container);
+        if (typeof (window as any).lucide !== 'undefined') (window as any).lucide.createIcons();
     }
 
-    createDraftItemElement(storeName, item) {
+    createDraftItemElement(storeName: string, item: any) {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'draft-item glassmorphism';
 
@@ -281,7 +278,7 @@ export class UnloadingController {
         viewBtn.innerHTML = '<i data-lucide="eye"></i>';
         viewBtn.onclick = (e) => {
             e.stopPropagation();
-            if (window.showItemViewModal) window.showItemViewModal(storeName, item);
+            if ((window as any).showItemViewModal) (window as any).showItemViewModal(storeName, item);
         };
 
         const editBtn = document.createElement('button');
@@ -290,7 +287,7 @@ export class UnloadingController {
         editBtn.innerHTML = '<i data-lucide="edit"></i>';
         editBtn.onclick = (e) => {
             e.stopPropagation();
-            if (window.editDraftItem) window.editDraftItem(storeName, item);
+            if ((window as any).editDraftItem) (window as any).editDraftItem(storeName, item);
         };
 
         const deleteBtn = document.createElement('button');
@@ -316,9 +313,7 @@ export class UnloadingController {
         const storeName = this.appState.selectedStore;
         if (!storeName) return;
 
-        const { DraftManager, SecureStorageManager, InventoryManager } = await import('../state.js');
-        const { SecureApiClient } = await import('../network.js');
-        const { generateUnloadingReport } = await import('../pdf.js');
+        const { generateUnloadingReport } = await import('../pdf.ts');
 
         const draft = await DraftManager.getDraft(storeName);
         if (draft.items.length === 0) {
@@ -326,7 +321,7 @@ export class UnloadingController {
             return;
         }
 
-        const submitBtn = document.getElementById('submitDraftBtn');
+        const submitBtn = document.getElementById('submitDraftBtn') as HTMLButtonElement;
         const submitBtnText = document.getElementById('submitDraftBtnText');
 
         if (!submitBtn) return;
@@ -336,7 +331,7 @@ export class UnloadingController {
         submitBtn.disabled = true;
         if (submitBtnText) submitBtnText.textContent = 'Генеруємо звіт...';
 
-        let pdfResult;
+        let pdfResult: any;
         try {
             const submissionTimestamp = new Date();
             const totalAmount = this.calculateTotalAmount(draft.items);
@@ -352,7 +347,7 @@ export class UnloadingController {
 
             const variant = this.abTestManager.getVariant('pdf-optimization');
             if (variant === 'variantB') {
-                const { generatePDFOptimized } = await import('../pdf-cache.js');
+                const { generatePDFOptimized } = await import('../pdf-cache.ts');
                 pdfResult = await generatePDFOptimized(pdfData, { download: false });
             } else {
                 pdfResult = await generateUnloadingReport(pdfData, { download: false });
@@ -362,7 +357,7 @@ export class UnloadingController {
             console.error('PDF generation error:', pdfError);
             submitBtn.disabled = false;
             if (submitBtnText) submitBtnText.textContent = originalText;
-            if (window.showPdfErrorModal) window.showPdfErrorModal(pdfError);
+            if ((window as any).showPdfErrorModal) (window as any).showPdfErrorModal(pdfError);
             return;
         }
 
@@ -370,7 +365,7 @@ export class UnloadingController {
         if (submitBtnText) submitBtnText.textContent = originalText;
 
         const now = new Date();
-        const confirmed = await window.showPdfPreviewModal({
+        const confirmed = await (window as any).showPdfPreviewModal({
             storeName,
             items: draft.items,
             date: now.toLocaleDateString('uk-UA'),
@@ -398,8 +393,8 @@ export class UnloadingController {
                 }
             }
 
-            if (window.refreshOperationsSummaryIfVisible) window.refreshOperationsSummaryIfVisible();
-            await window.downloadPdfFile(pdfResult.blob, pdfResult.fileName);
+            if ((window as any).refreshOperationsSummaryIfVisible) (window as any).refreshOperationsSummaryIfVisible();
+            await (window as any).downloadPdfFile(pdfResult.blob, pdfResult.fileName);
             await DraftManager.deleteDraft(storeName);
 
             this.toastManager.show(`Відправлено ${draft.items.length} товарів. PDF збережено`, 'success');
@@ -409,7 +404,7 @@ export class UnloadingController {
 
         } catch (serverError) {
             console.error('Server submit error:', serverError);
-            await window.downloadPdfFile(pdfResult.blob, pdfResult.fileName);
+            await (window as any).downloadPdfFile(pdfResult.blob, pdfResult.fileName);
             this.toastManager.show('Помилка відправки. PDF збережено локально.', 'error');
         } finally {
             submitBtn.disabled = false;
@@ -417,13 +412,22 @@ export class UnloadingController {
         }
     }
 
-    calculateTotalAmount(items) {
+    calculateTotalAmount(items: any[]): number {
         return items.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
     }
 
-    async removeItemFromDraft(storeName, itemId) {
+    calculateTotalWeight(items: any[]): number {
+        return items.reduce((sum, item) => {
+            // Assume weight is in kg if unit is kg, else 0 for weight based count
+            if (item.unit === 'кг' || item.unit === 'kg') {
+                return sum + (Number(item.quantity) || 0);
+            }
+            return sum;
+        }, 0);
+    }
+
+    async removeItemFromDraft(storeName: string, itemId: string) {
         if (!confirm('Видалити товар з чернетки?')) return;
-        const { DraftManager } = await import('../state.js');
         await DraftManager.removeItemFromDraft(storeName, itemId);
         this.toastManager.show('Товар видалено', 'success');
 
@@ -436,9 +440,8 @@ export class UnloadingController {
         }
     }
 
-    async deleteDraft(storeName) {
+    async deleteDraft(storeName: string) {
         if (!confirm(`Видалити всю чернетку "${storeName}"?`)) return;
-        const { DraftManager } = await import('../state.js');
         await DraftManager.deleteDraft(storeName);
         this.toastManager.show('Чернетку видалено', 'success');
         await this.showDraftsList();

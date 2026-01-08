@@ -405,11 +405,56 @@ class AppUIAdapter {
     }
 }
 
+class PhotoCompressor {
+    static async compress(file: File): Promise<Blob | File> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('Cannot read file'));
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onerror = () => reject(new Error('Cannot load image'));
+                img.onload = () => {
+                    try {
+                        const MAX_WIDTH = 1024;
+                        const MAX_HEIGHT = 1024;
+                        let { width, height } = img;
+                        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+                            width = Math.round(width * ratio);
+                            height = Math.round(height * ratio);
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            reject(new Error('Cannot get canvas context'));
+                            return;
+                        }
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, width, height);
+                        canvas.toBlob((blob) => {
+                            if (blob && blob.size < file.size) resolve(blob);
+                            else canvas.toBlob((jpegBlob) => resolve(jpegBlob || file), 'image/jpeg', 0.85);
+                        }, 'image/webp', 0.85);
+                    } catch (error) {
+                        reject(new Error('Compression failed: ' + (error instanceof Error ? error.message : String(error))));
+                    }
+                };
+                img.src = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+}
+
 export {
     EventManager,
     SkeletonLoader,
     AnimationManager,
     ToastManager,
     ThemeManager,
-    AppUIAdapter
+    AppUIAdapter,
+    PhotoCompressor
 };

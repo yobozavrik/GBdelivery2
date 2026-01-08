@@ -1,5 +1,10 @@
+import { AppState } from '../state.ts';
+
 export class NavigationController {
-    constructor(appState, controllers) {
+    private appState: AppState;
+    private controllers: any;
+
+    constructor(appState: AppState, controllers: any) {
         this.appState = appState;
         this.controllers = controllers;
     }
@@ -26,13 +31,13 @@ export class NavigationController {
             this.appState.setScreen('main');
         } else if (screen === 'operations-detail') {
             this.appState.setScreen('operations-summary', { isUnloading: false, isDelivery: false, operationType: null });
-            if (window.renderOperationsSummary) await window.renderOperationsSummary();
+            if ((window as any).renderOperationsSummary) await (window as any).renderOperationsSummary();
         } else {
             this.appState.setScreen('main');
         }
     }
 
-    async switchTab(tab) {
+    async switchTab(tab: string) {
         this.appState.setTab(tab);
         if (tab === 'history' && this.controllers.history) {
             await this.controllers.history.updateHistoryDisplay();

@@ -1,13 +1,39 @@
+import { AppState, SecureStorageManager, InventoryManager } from '../state.js';
+import { ToastManager, AppUIAdapter, SkeletonLoader, AnimationManager } from '../ui.js';
+import { SecureConfig } from '../config.js';
+
 export class HistoryController {
-    constructor(appState, appUI, toastManager, SecureStorageManager, InventoryManager, SecureApiClient, SkeletonLoader, AnimationManager, currencyFormatter, config) {
-        this.appState = appState;
-        this.appUI = appUI;
+    // private appState: AppState; // Unused
+    // private appUI: AppUIAdapter; // Unused
+    private toastManager: ToastManager;
+    private SecureStorageManager: typeof SecureStorageManager;
+    private InventoryManager: typeof InventoryManager;
+    private SecureApiClient: any;
+    private SkeletonLoader: typeof SkeletonLoader;
+    private AnimationManager: typeof AnimationManager;
+    private currencyFormatter: any;
+    private config: SecureConfig;
+
+    constructor(
+        _appState: AppState,
+        _appUI: AppUIAdapter,
+        toastManager: ToastManager,
+        secureStorageManager: typeof SecureStorageManager,
+        inventoryManager: typeof InventoryManager,
+        secureApiClient: any,
+        skeletonLoader: typeof SkeletonLoader,
+        animationManager: typeof AnimationManager,
+        currencyFormatter: any,
+        config: SecureConfig
+    ) {
+        // this.appState = appState;
+        // this.appUI = appUI;
         this.toastManager = toastManager;
-        this.SecureStorageManager = SecureStorageManager;
-        this.InventoryManager = InventoryManager;
-        this.SecureApiClient = SecureApiClient;
-        this.SkeletonLoader = SkeletonLoader;
-        this.AnimationManager = AnimationManager;
+        this.SecureStorageManager = secureStorageManager;
+        this.InventoryManager = inventoryManager;
+        this.SecureApiClient = secureApiClient;
+        this.SkeletonLoader = skeletonLoader;
+        this.AnimationManager = animationManager;
         this.currencyFormatter = currencyFormatter;
         this.config = config;
     }
@@ -43,10 +69,10 @@ export class HistoryController {
 
         container.appendChild(fragment);
         this.AnimationManager.animateListItems(container);
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        if (typeof (window as any).lucide !== 'undefined') (window as any).lucide.createIcons();
     }
 
-    createHistoryItemElement(item) {
+    createHistoryItemElement(item: any) {
         const div = document.createElement('div');
         div.className = 'history-item glassmorphism';
 
@@ -116,7 +142,7 @@ export class HistoryController {
             await this.SecureStorageManager.clearHistory();
             await this.InventoryManager.clearDailyStock();
             await this.updateHistoryDisplay();
-            if (window.refreshOperationsSummaryIfVisible) window.refreshOperationsSummaryIfVisible();
+            if ((window as any).refreshOperationsSummaryIfVisible) (window as any).refreshOperationsSummaryIfVisible();
             document.getElementById('aiSummaryModal')?.classList.remove('visible');
             this.toastManager.show('Історію та залишки очищено', 'success');
         }

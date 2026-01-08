@@ -1,7 +1,17 @@
+import { AppState, PurchaseDraftManager, SecureStorageManager, InventoryManager } from '../state.js';
+import { ToastManager, AppUIAdapter, SkeletonLoader, AnimationManager } from '../ui.js';
+import { ABTestManager } from '../ab-testing.js';
+import { SecureApiClient } from '../network.js';
+
 export class PurchaseController {
-    constructor(appState, appUI, toastManager, abTestManager) {
+    private appState: AppState;
+    // private appUI: AppUIAdapter; // Unused
+    private toastManager: ToastManager;
+    private abTestManager: ABTestManager;
+
+    constructor(appState: AppState, _appUI: AppUIAdapter, toastManager: ToastManager, abTestManager: ABTestManager) {
         this.appState = appState;
-        this.appUI = appUI;
+        // this.appUI = appUI;
         this.toastManager = toastManager;
         this.abTestManager = abTestManager;
     }
@@ -23,14 +33,9 @@ export class PurchaseController {
         const useOptimizedRender = variant === 'variantB';
 
         emptyState.style.display = 'none';
-        // Note: SkeletonLoader is global for now, but should ideally be imported
-        if (window.SkeletonLoader) {
-            window.SkeletonLoader.showDraftsSkeleton(container, 3);
-        }
+        SkeletonLoader.showDraftsSkeleton(container, 3);
         summary.textContent = 'Завантаження...';
 
-        // Note: PurchaseDraftManager should be imported or passed as dependency
-        const { PurchaseDraftManager } = await import('../state.js');
         const drafts = await PurchaseDraftManager.getAllDraftsArray();
 
         this.abTestManager.trackEvent('list-optimization', 'purchase-list-rendered', {
@@ -52,17 +57,17 @@ export class PurchaseController {
 
         if (useOptimizedRender && drafts.length > 10) {
             try {
-                const { OptimizedDraftsRenderer } = await import('../optimized-list.js');
+                const { OptimizedDraftsRenderer } = await import('../optimized-list.ts');
                 const renderer = new OptimizedDraftsRenderer(container, { pageSize: 10 });
 
                 const rendererData = drafts.map(draft => ({
                     ...draft,
                     storeName: draft.locationName,
-                    onView: (e) => {
+                    onView: (e: Event) => {
                         e.stopPropagation();
                         this.showPurchaseDraftView(draft.locationName);
                     },
-                    onDelete: (e) => {
+                    onDelete: (e: Event) => {
                         e.stopPropagation();
                         this.deletePurchaseDraft(draft.locationName);
                     }
@@ -84,15 +89,13 @@ export class PurchaseController {
         });
 
         container.appendChild(fragment);
-        if (window.AnimationManager) {
-            window.AnimationManager.animateListItems(container);
-        }
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
+        AnimationManager.animateListItems(container);
+        if (typeof (window as any).lucide !== 'undefined') {
+            (window as any).lucide.createIcons();
         }
     }
 
-    createDraftCard(draft) {
+    createDraftCard(draft: any) {
         const card = document.createElement('div');
         card.className = 'draft-card glassmorphism';
 
@@ -141,7 +144,7 @@ export class PurchaseController {
         return card;
     }
 
-    async showPurchaseDraftView(locationName) {
+    async showPurchaseDraftView(locationName: string) {
         this.appState.selectedStore = locationName;
         this.appState.setScreen('purchase-draft-view');
 
@@ -149,7 +152,7 @@ export class PurchaseController {
         const summary = document.getElementById('purchaseDraftViewSummary');
         const container = document.getElementById('purchaseDraftItems');
         const emptyState = document.getElementById('purchaseDraftItemsEmpty');
-        const submitBtn = document.getElementById('submitPurchaseDraftBtn');
+        const submitBtn = document.getElementById('submitPurchaseDraftBtn') as HTMLButtonElement;
         const submitBtnText = document.getElementById('submitPurchaseDraftBtnText');
 
         if (!title || !summary || !container || !emptyState) return;
@@ -157,12 +160,9 @@ export class PurchaseController {
         title.textContent = locationName;
 
         emptyState.style.display = 'none';
-        if (window.SkeletonLoader) {
-            window.SkeletonLoader.showDraftItemsSkeleton(container, 5);
-        }
+        SkeletonLoader.showDraftItemsSkeleton(container, 5);
         summary.textContent = 'Завантаження...';
 
-        const { PurchaseDraftManager } = await import('../state.js');
         const draft = await PurchaseDraftManager.getDraft(locationName);
 
         const itemCount = draft.items.length;
@@ -183,19 +183,17 @@ export class PurchaseController {
         container.style.display = 'flex';
 
         const fragment = document.createDocumentFragment();
-        draft.items.forEach(item => {
+        draft.items.forEach((item: any) => {
             const itemDiv = this.createDraftItemElement(locationName, item);
             fragment.appendChild(itemDiv);
         });
 
         container.appendChild(fragment);
-        if (window.AnimationManager) {
-            window.AnimationManager.animateListItems(container);
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        AnimationManager.animateListItems(container);
+        if (typeof (window as any).lucide !== 'undefined') (window as any).lucide.createIcons();
     }
 
-    createDraftItemElement(locationName, item) {
+    createDraftItemElement(locationName: string, item: any) {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'draft-item glassmorphism';
 
@@ -217,7 +215,6 @@ export class PurchaseController {
         name.className = 'draft-item-name';
         name.textContent = item.productName;
 
-        // Note: config should be imported
         const unitLabel = item.unit; // Default
         const details = document.createElement('div');
         details.className = 'draft-item-details';
@@ -236,7 +233,7 @@ export class PurchaseController {
         viewBtn.innerHTML = '<i data-lucide="eye"></i>';
         viewBtn.onclick = (e) => {
             e.stopPropagation();
-            if (window.showItemViewModal) window.showItemViewModal(locationName, item);
+            if ((window as any).showItemViewModal) (window as any).showItemViewModal(locationName, item);
         };
 
         const editBtn = document.createElement('button');
@@ -245,7 +242,7 @@ export class PurchaseController {
         editBtn.innerHTML = '<i data-lucide="edit"></i>';
         editBtn.onclick = (e) => {
             e.stopPropagation();
-            if (window.editDraftItem) window.editDraftItem(locationName, item);
+            if ((window as any).editDraftItem) (window as any).editDraftItem(locationName, item);
         };
 
         const deleteBtn = document.createElement('button');
@@ -267,7 +264,7 @@ export class PurchaseController {
         return itemDiv;
     }
 
-    async selectPurchaseLocation(locationName) {
+    async selectPurchaseLocation(locationName: string) {
         this.appState.selectedStore = locationName;
 
         if (locationName === 'Метро') {
@@ -275,7 +272,6 @@ export class PurchaseController {
             return;
         }
 
-        const { PurchaseDraftManager } = await import('../state.js');
         const draft = await PurchaseDraftManager.getDraft(locationName);
         if (draft.items.length > 0) {
             await this.showPurchaseDraftView(locationName);
@@ -283,7 +279,7 @@ export class PurchaseController {
             this.appState.setScreen('purchase-form');
             this.appState.isUnloading = false;
             this.appState.isDelivery = false;
-            if (window.setupPurchaseForm) window.setupPurchaseForm();
+            if ((window as any).setupPurchaseForm) (window as any).setupPurchaseForm();
         }
     }
 
@@ -291,15 +287,12 @@ export class PurchaseController {
         this.appState.setScreen('purchase-form');
         this.appState.isUnloading = false;
         this.appState.isDelivery = false;
-        if (window.setupPurchaseForm) window.setupPurchaseForm();
+        if ((window as any).setupPurchaseForm) (window as any).setupPurchaseForm();
     }
 
     async submitPurchaseDraft() {
         const locationName = this.appState.selectedStore;
         if (!locationName) return;
-
-        const { PurchaseDraftManager, SecureStorageManager, InventoryManager } = await import('../state.js');
-        const { SecureApiClient } = await import('../network.js');
 
         const draft = await PurchaseDraftManager.getDraft(locationName);
         if (draft.items.length === 0) {
@@ -307,7 +300,7 @@ export class PurchaseController {
             return;
         }
 
-        const submitBtn = document.getElementById('submitPurchaseDraftBtn');
+        const submitBtn = document.getElementById('submitPurchaseDraftBtn') as HTMLButtonElement;
         const submitBtnText = document.getElementById('submitPurchaseDraftBtnText');
 
         if (!submitBtn) return;
@@ -325,7 +318,7 @@ export class PurchaseController {
                 await InventoryManager.addStock(item.productName, item.quantity, item.unit);
             }
 
-            if (window.refreshOperationsSummaryIfVisible) window.refreshOperationsSummaryIfVisible();
+            if ((window as any).refreshOperationsSummaryIfVisible) (window as any).refreshOperationsSummaryIfVisible();
 
             this.toastManager.show(`Відправлено ${draft.items.length} товарів`, 'success');
             await PurchaseDraftManager.deleteDraft(locationName);
@@ -342,9 +335,8 @@ export class PurchaseController {
         }
     }
 
-    async removeItemFromPurchaseDraft(locationName, itemId) {
+    async removeItemFromPurchaseDraft(locationName: string, itemId: string) {
         if (!confirm('Видалити товар з чернетки?')) return;
-        const { PurchaseDraftManager } = await import('../state.js');
         await PurchaseDraftManager.removeItemFromDraft(locationName, itemId);
         this.toastManager.show('Товар видалено', 'success');
 
@@ -357,9 +349,8 @@ export class PurchaseController {
         }
     }
 
-    async deletePurchaseDraft(locationName) {
+    async deletePurchaseDraft(locationName: string) {
         if (!confirm(`Видалити всю чернетку "${locationName}"?`)) return;
-        const { PurchaseDraftManager } = await import('../state.js');
         await PurchaseDraftManager.deleteDraft(locationName);
         this.toastManager.show('Чернетку видалено', 'success');
         await this.showPurchaseDraftsList();

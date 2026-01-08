@@ -1,9 +1,35 @@
-/**
- * A/B Testing Module
- * Підтримка A/B тестування для оптимізації продуктивності та UX
- */
+interface ABTestConfig {
+    name: string;
+    split: number;
+    variantA: string;
+    variantB: string;
+    active: boolean;
+    metadata: Record<string, any>;
+}
 
-class ABTestManager {
+interface ABTestResult {
+    testName: string;
+    variant: string;
+    userId: string;
+    timestamp: number;
+    config: ABTestConfig;
+}
+
+interface ABAnalyticsEvent {
+    testName: string;
+    variant: string;
+    eventName: string;
+    data: Record<string, any>;
+    timestamp: number;
+    userId: string;
+}
+
+export class ABTestManager {
+    private tests: Map<string, ABTestConfig>;
+    private results: Map<string, ABTestResult>;
+    private activeTests: Set<string>;
+    private analytics: ABAnalyticsEvent[];
+
     constructor() {
         this.tests = new Map();
         this.results = new Map();
@@ -19,13 +45,13 @@ class ABTestManager {
      * @param {string} config.variantA - Код варіанту A
      * @param {string} config.variantB - Код варіанту B
      */
-    registerTest(testName, config) {
+    registerTest(testName: string, config: Partial<ABTestConfig>) {
         if (this.tests.has(testName)) {
             console.warn(`Test ${testName} already registered`);
             return;
         }
 
-        const testConfig = {
+        const testConfig: ABTestConfig = {
             name: testName,
             split: config.split || 50,
             variantA: config.variantA || 'control',
@@ -46,7 +72,7 @@ class ABTestManager {
     /**
      * Активація тесту
      */
-    activateTest(testName) {
+    activateTest(testName: string): ABTestResult | null {
         const testConfig = this.tests.get(testName);
         if (!testConfig) {
             console.error(`Test ${testName} not found`);
@@ -64,7 +90,7 @@ class ABTestManager {
         const variant = this.getVariant(testName, userId);
 
         // Зберігаємо рішення
-        const testResult = {
+        const testResult: ABTestResult = {
             testName,
             variant,
             userId,
@@ -83,7 +109,7 @@ class ABTestManager {
     /**
      * Отримати активний варіант для тесту
      */
-    getVariant(testName, userId = null) {
+    getVariant(testName: string, userId: string | null = null): string {
         const result = this.results.get(testName);
         if (result) {
             return result.variant;
@@ -109,20 +135,20 @@ class ABTestManager {
     /**
      * Перевірка, чи активний тест
      */
-    isTestActive(testName) {
+    isTestActive(testName: string): boolean {
         return this.activeTests.has(testName);
     }
 
     /**
      * Відстеження події для аналітики
      */
-    trackEvent(testName, eventName, data = {}) {
+    trackEvent(testName: string, eventName: string, data: Record<string, any> = {}) {
         const result = this.results.get(testName);
         if (!result) {
             return;
         }
 
-        const event = {
+        const event: ABAnalyticsEvent = {
             testName,
             variant: result.variant,
             eventName,
@@ -144,9 +170,9 @@ class ABTestManager {
     /**
      * Отримати статистику тесту
      */
-    getTestStats(testName) {
+    getTestStats(testName: string) {
         const events = this.analytics.filter(e => e.testName === testName);
-        const grouped = {};
+        const grouped: Record<string, Record<string, number>> = {};
 
         events.forEach(event => {
             if (!grouped[event.variant]) {
@@ -168,11 +194,11 @@ class ABTestManager {
     /**
      * Допоміжні методи
      */
-    generateUserId() {
-        return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    generateUserId(): string {
+        return `user_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     }
 
-    hashCode(str) {
+    hashCode(str: string): number {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
@@ -187,10 +213,10 @@ class ABTestManager {
      */
     exportAnalytics() {
         const analytics = JSON.parse(localStorage.getItem('ab_analytics') || '[]');
-        
+
         // TODO: Відправка на сервер або в Google Analytics
         // await this.sendToServer(analytics);
-        
+
         return analytics;
     }
 

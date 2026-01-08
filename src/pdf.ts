@@ -1,13 +1,52 @@
 const PDF_LIB_CDN_URL = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.esm.min.js';
 const FONTKIT_CDN_URL = 'https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js';
 
-let pdfLibModulePromise = null;
-let fontkitModulePromise = null;
-let PDFDocument;
-let StandardFonts;
-let rgb;
+let pdfLibModulePromise: Promise<any> | null = null;
+let fontkitModulePromise: Promise<any> | null = null;
+let PDFDocument: any;
+let StandardFonts: any;
+let rgb: any;
 
-async function loadPdfLib() {
+interface PdfMetadata {
+    storeName: string;
+    date: string;
+    time: string;
+    submittedAt: Date;
+    itemsCount: number;
+    totalAmount: string;
+    totalWeight: number;
+    summary: string;
+}
+
+interface PdfFonts {
+    regular: any;
+    bold: any;
+}
+
+interface PdfContext {
+    pdfDoc: any;
+    fonts: PdfFonts;
+    metadata: PdfMetadata;
+    totals: {
+        amount: number;
+    };
+    page: any;
+    cursorY: number;
+}
+
+interface UnloadingBatchData {
+    storeName?: string;
+    items?: any[];
+    submittedAt?: string | Date;
+    totalWeight?: number;
+    summary?: string;
+}
+
+interface PdfOptions {
+    download?: boolean;
+}
+
+async function loadPdfLib(): Promise<any> {
     if (!pdfLibModulePromise) {
         pdfLibModulePromise = import(/* @vite-ignore */ PDF_LIB_CDN_URL)
             .then((module) => {
@@ -20,7 +59,7 @@ async function loadPdfLib() {
                 pdfLibModulePromise = null;
                 console.error('Failed to load pdf-lib from CDN.', error);
                 const failure = new Error('Failed to load pdf-lib from CDN.');
-                failure.cause = error;
+                (failure as any).cause = error;
                 throw failure;
             });
     }
@@ -28,25 +67,22 @@ async function loadPdfLib() {
     return pdfLibModulePromise;
 }
 
-async function loadFontkit() {
+async function loadFontkit(): Promise<any> {
     if (!fontkitModulePromise) {
         fontkitModulePromise = new Promise((resolve, reject) => {
-            // Проверяем, не загружен ли fontkit уже через window.fontkit
-            if (window.fontkit) {
-                resolve(window.fontkit);
+            if ((window as any).fontkit) {
+                resolve((window as any).fontkit);
                 return;
             }
 
-            // Создаем script тег для загрузки fontkit
             const script = document.createElement('script');
             script.src = FONTKIT_CDN_URL;
             script.async = true;
 
             script.onload = () => {
-                // После загрузки UMD модуля fontkit доступен через window.fontkit
-                if (window.fontkit) {
+                if ((window as any).fontkit) {
                     console.log('✅ fontkit loaded successfully');
-                    resolve(window.fontkit);
+                    resolve((window as any).fontkit);
                 } else {
                     reject(new Error('fontkit loaded but not found in window'));
                 }
@@ -65,14 +101,13 @@ async function loadFontkit() {
     return fontkitModulePromise;
 }
 
-// Массив URL шрифтов с поддержкой кириллицы (приоритет сверху вниз)
 const FONT_URLS = [
     'https://cdn.jsdelivr.net/npm/@fontsource/roboto@4.5.8/files/roboto-cyrillic-400-normal.woff',
     'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans@4.5.11/files/noto-sans-cyrillic-400-normal.woff',
-    'fonts/Roboto-Regular.ttf' // Локальный fallback
+    'fonts/Roboto-Regular.ttf'
 ];
-const PAGE_WIDTH = 595.28; // A4 width in points
-const PAGE_HEIGHT = 841.89; // A4 height in points
+const PAGE_WIDTH = 595.28;
+const PAGE_HEIGHT = 841.89;
 const MARGINS = { top: 60, right: 40, bottom: 60, left: 40 };
 const TABLE_COLUMNS = [
     { key: 'productName', title: 'Товар', width: 150, align: 'left' },
@@ -81,67 +116,45 @@ const TABLE_COLUMNS = [
     { key: 'source', title: 'Джерело', width: 95, align: 'left' },
     { key: 'pricePerUnit', title: 'Ціна', width: 70, align: 'right' },
     { key: 'totalAmount', title: 'Сума', width: 70, align: 'right' }
-];
+] as const;
+
 const TABLE_PADDING_X = 6;
 const LINE_HEIGHT = 16;
 
-let cachedFontBytes = null;
+let cachedFontBytes: ArrayBuffer | null = null;
 
-async function loadFontBytes() {
+async function loadFontBytes(): Promise<ArrayBuffer | null> {
     if (cachedFontBytes) {
-        console.log('✅ Using cached font');
         return cachedFontBytes;
     }
 
-    // Пробуем каждый URL по очереди
     for (let i = 0; i < FONT_URLS.length; i++) {
         const url = FONT_URLS[i];
         try {
-            console.log(`📥 Trying to load font (attempt ${i + 1}/${FONT_URLS.length}):`, url);
             const response = await fetch(url);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             cachedFontBytes = await response.arrayBuffer();
-            console.log('✅ Font loaded successfully from:', url);
-            console.log('📦 Font size:', cachedFontBytes.byteLength, 'bytes');
             return cachedFontBytes;
-        } catch (error) {
-            console.warn(`⚠️ Failed to load from: ${url} - ${error.message}`);
-
-            // Если это была последняя попытка
-            if (i === FONT_URLS.length - 1) {
-                console.error('❌ All font sources failed');
-                console.warn('⚠️ Will try to use standard fonts (no Cyrillic support)');
-                return null;
-            }
-
-            // Иначе пробуем следующий URL
-            console.log('🔄 Trying next font source...');
+        } catch (error: any) {
+            console.warn(`⚠️ Failed to load font from ${url}: ${error.message}`);
+            if (i === FONT_URLS.length - 1) return null;
         }
     }
 
     return null;
 }
 
-function formatMoney(value) {
+function formatMoney(value: any): string {
     const numericValue = Number(value);
-    if (!Number.isFinite(numericValue)) {
-        return '';
-    }
-
+    if (!Number.isFinite(numericValue)) return '';
     return numericValue.toLocaleString('uk-UA', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
 }
 
-function formatQuantity(value) {
-    if (value === undefined || value === null) {
-        return '';
-    }
+function formatQuantity(value: any): string {
+    if (value === undefined || value === null) return '';
     const numericValue = Number(value);
     if (Number.isFinite(numericValue)) {
         return numericValue % 1 === 0 ? numericValue.toString() : numericValue.toLocaleString('uk-UA');
@@ -149,38 +162,17 @@ function formatQuantity(value) {
     return String(value);
 }
 
-function formatSource(source) {
-    if (!source) {
-        return '—';
-    }
-    if (source === 'purchase') {
-        return 'Закупка';
-    }
-    // Названия складов передаются как есть
+function formatSource(source: string | undefined): string {
+    if (!source) return '—';
+    if (source === 'purchase') return 'Закупка';
     return source;
 }
 
-function sanitizeFileName(value) {
-    if (!value || typeof value !== 'string') {
-        return 'unloading-report';
-    }
-
-    return value
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/[^\p{L}\p{N}\-]+/gu, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .toLowerCase() || 'unloading-report';
-}
-
-function splitTextIntoLines(text, font, fontSize, maxWidth) {
-    if (!text) {
-        return [''];
-    }
+function splitTextIntoLines(text: string, font: any, fontSize: number, maxWidth: number): string[] {
+    if (!text) return [''];
 
     const words = text.split(/\s+/);
-    const lines = [];
+    const lines: string[] = [];
     let currentLine = '';
 
     for (const word of words) {
@@ -195,36 +187,30 @@ function splitTextIntoLines(text, font, fontSize, maxWidth) {
         }
     }
 
-    if (currentLine) {
-        lines.push(currentLine);
-    }
-
+    if (currentLine) lines.push(currentLine);
     return lines.length > 0 ? lines : [''];
 }
 
-function bytesToBase64(bytes) {
+function bytesToBase64(bytes: Uint8Array): string {
     let binary = '';
     const chunkSize = 0x8000;
     for (let i = 0; i < bytes.length; i += chunkSize) {
         const chunk = bytes.subarray(i, i + chunkSize);
-        binary += String.fromCharCode.apply(null, chunk);
+        binary += String.fromCharCode.apply(null, chunk as any);
     }
     return btoa(binary);
 }
 
-function ensureArray(items) {
-    if (!Array.isArray(items)) {
-        return [];
-    }
+function ensureArray(items: any): any[] {
+    if (!Array.isArray(items)) return [];
     return items;
 }
 
-function drawTableHeader(page, font, startY) {
+function drawTableHeader(page: any, font: any, startY: number): number {
     const { width } = page.getSize();
     const tableWidth = width - (MARGINS.left + MARGINS.right);
     const headerHeight = LINE_HEIGHT + 6;
     const headerBottom = startY - headerHeight;
-    const headerTop = headerBottom + headerHeight;
 
     page.drawRectangle({
         x: MARGINS.left,
@@ -251,7 +237,7 @@ function drawTableHeader(page, font, startY) {
     return headerBottom - 4;
 }
 
-function createNewPage(pdfDoc, fonts, { isFirstPage, metadata }) {
+function createNewPage(pdfDoc: any, fonts: PdfFonts, options: { isFirstPage: boolean, metadata: PdfMetadata }): { page: any, cursorY: number } {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     let cursorY = PAGE_HEIGHT - MARGINS.top;
 
@@ -268,7 +254,25 @@ function createNewPage(pdfDoc, fonts, { isFirstPage, metadata }) {
 
     cursorY -= LINE_HEIGHT * 1.6;
 
-    page.drawText(`Торгова точка: ${metadata.storeName}`, {
+    page.drawText(`Торгова точка: ${options.metadata.storeName}`, {
+        x: MARGINS.left,
+        y: cursorY,
+        size: 12,
+        font: textFont,
+        color: rgb(0.16, 0.16, 0.16)
+    });
+
+    cursorY -= LINE_HEIGHT;
+    page.drawText(`Дата: ${options.metadata.date}`, {
+        x: MARGINS.left,
+        y: cursorY,
+        size: 12,
+        font: textFont,
+        color: rgb(0.16, 0.16, 0.16)
+    });
+
+    cursorY -= LINE_HEIGHT;
+    page.drawText(`Час: ${options.metadata.time}`, {
         x: MARGINS.left,
         y: cursorY,
         size: 12,
@@ -278,28 +282,8 @@ function createNewPage(pdfDoc, fonts, { isFirstPage, metadata }) {
 
     cursorY -= LINE_HEIGHT;
 
-    page.drawText(`Дата: ${metadata.date}`, {
-        x: MARGINS.left,
-        y: cursorY,
-        size: 12,
-        font: textFont,
-        color: rgb(0.16, 0.16, 0.16)
-    });
-
-    cursorY -= LINE_HEIGHT;
-
-    page.drawText(`Час: ${metadata.time}`, {
-        x: MARGINS.left,
-        y: cursorY,
-        size: 12,
-        font: textFont,
-        color: rgb(0.16, 0.16, 0.16)
-    });
-
-    cursorY -= LINE_HEIGHT;
-
-    if (isFirstPage) {
-        page.drawText(`Кількість позицій: ${metadata.itemsCount}`, {
+    if (options.isFirstPage) {
+        page.drawText(`Кількість позицій: ${options.metadata.itemsCount}`, {
             x: MARGINS.left,
             y: cursorY,
             size: 12,
@@ -309,19 +293,18 @@ function createNewPage(pdfDoc, fonts, { isFirstPage, metadata }) {
 
         cursorY -= LINE_HEIGHT;
 
-        if (metadata.totalWeight && metadata.totalWeight > 0) {
-            page.drawText(`Загальна вага: ${metadata.totalWeight} кг`, {
+        if (options.metadata.totalWeight > 0) {
+            page.drawText(`Загальна вага: ${options.metadata.totalWeight} кг`, {
                 x: MARGINS.left,
                 y: cursorY,
                 size: 12,
                 font: textFont,
                 color: rgb(0.16, 0.16, 0.16)
             });
-
             cursorY -= LINE_HEIGHT;
         }
 
-        page.drawText(`Загальна сума: ${metadata.totalAmount} ₴`, {
+        page.drawText(`Загальна сума: ${options.metadata.totalAmount} ₴`, {
             x: MARGINS.left,
             y: cursorY,
             size: 12,
@@ -331,7 +314,7 @@ function createNewPage(pdfDoc, fonts, { isFirstPage, metadata }) {
 
         cursorY -= LINE_HEIGHT * 1.5;
 
-        const summaryText = metadata.summary;
+        const summaryText = options.metadata.summary;
         const summaryLines = splitTextIntoLines(summaryText, textFont, 11, PAGE_WIDTH - (MARGINS.left + MARGINS.right));
         for (const line of summaryLines) {
             page.drawText(line, {
@@ -355,11 +338,10 @@ function createNewPage(pdfDoc, fonts, { isFirstPage, metadata }) {
     }
 
     cursorY -= LINE_HEIGHT;
-
     return { page, cursorY };
 }
 
-function ensureSpaceForRow(context, requiredHeight) {
+function ensureSpaceForRow(context: PdfContext, requiredHeight: number): void {
     if (context.cursorY - requiredHeight < MARGINS.bottom) {
         const { page, cursorY } = createNewPage(context.pdfDoc, context.fonts, {
             isFirstPage: false,
@@ -370,7 +352,7 @@ function ensureSpaceForRow(context, requiredHeight) {
     }
 }
 
-function drawTableRow(context, item, index) {
+function drawTableRow(context: PdfContext, item: any, index: number): void {
     const { page, fonts } = context;
     const fontSize = 11;
     const nameLines = splitTextIntoLines(item.productName || '—', fonts.regular, fontSize, TABLE_COLUMNS[0].width - (TABLE_PADDING_X * 2));
@@ -443,7 +425,7 @@ function drawTableRow(context, item, index) {
     context.cursorY = rowBottom - 4;
 }
 
-function drawTotalsRow(context) {
+function drawTotalsRow(context: PdfContext): void {
     const { page, fonts, totals } = context;
     const fontSize = 12;
     const tableWidth = PAGE_WIDTH - (MARGINS.left + MARGINS.right);
@@ -486,7 +468,7 @@ function drawTotalsRow(context) {
     context.cursorY = rowBottom - 4;
 }
 
-export async function generateUnloadingReport(batchData, options = {}) {
+export async function generateUnloadingReport(batchData: UnloadingBatchData, options: PdfOptions = {}): Promise<any> {
     await loadPdfLib();
 
     const {
@@ -503,34 +485,21 @@ export async function generateUnloadingReport(batchData, options = {}) {
     }
 
     const pdfDoc = await PDFDocument.create();
-
-    let fonts;
+    let fonts: PdfFonts;
 
     try {
-        // Загружаем и регистрируем fontkit для поддержки кириллицы
-        console.log('📦 Loading fontkit...');
         const fontkit = await loadFontkit();
         pdfDoc.registerFontkit(fontkit);
-
-        // Загружаем кастомный шрифт (поддерживает украинский)
         const fontBytes = await loadFontBytes();
 
         if (fontBytes) {
-            console.log('📝 Embedding custom font with Cyrillic support...');
             const customFont = await pdfDoc.embedFont(fontBytes);
-            fonts = {
-                regular: customFont,
-                bold: customFont
-            };
-            console.log('✅ Custom font embedded successfully');
+            fonts = { regular: customFont, bold: customFont };
         } else {
             throw new Error('Font bytes not loaded');
         }
     } catch (fontError) {
         console.error('❌ Custom font failed, using standard fonts:', fontError);
-        console.warn('⚠️ PDF will be generated but Cyrillic characters may not display correctly');
-
-        // Fallback на стандартные шрифты (только латиница!)
         fonts = {
             regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
             bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
@@ -546,20 +515,10 @@ export async function generateUnloadingReport(batchData, options = {}) {
     }, 0);
 
     const dateObj = new Date(submittedAt);
-    const dateStr = dateObj.toLocaleDateString('uk-UA', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    });
-    const timeStr = dateObj.toLocaleTimeString('uk-UA', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-
-    const metadata = {
+    const metadata: PdfMetadata = {
         storeName,
-        date: dateStr,
-        time: timeStr,
+        date: dateObj.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        time: dateObj.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }),
         submittedAt: dateObj,
         itemsCount: resolvedItems.length,
         totalAmount: formatMoney(totalAmount),
@@ -567,20 +526,17 @@ export async function generateUnloadingReport(batchData, options = {}) {
         summary: summary || 'Документ згенеровано автоматично у додатку «Облік закупівель».'
     };
 
-    const context = {
+    const { page, cursorY } = createNewPage(pdfDoc, fonts, { isFirstPage: true, metadata });
+
+    const context: PdfContext = {
         pdfDoc,
         fonts,
         metadata,
-        totals: {
-            amount: totalAmount
-        }
+        totals: { amount: totalAmount },
+        page,
+        cursorY
     };
 
-    const { page, cursorY } = createNewPage(pdfDoc, fonts, {
-        isFirstPage: true,
-        metadata
-    });
-    context.page = page;
     context.cursorY = drawTableHeader(context.page, context.fonts.bold, cursorY);
 
     resolvedItems.forEach((item, index) => {
@@ -593,15 +549,8 @@ export async function generateUnloadingReport(batchData, options = {}) {
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const base64 = bytesToBase64(pdfBytes);
 
-    // Формат: Відвантаження_Гравітон_22-10-2025_14-35.pdf
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const year = dateObj.getFullYear();
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-
-    const dateForFile = `${day}-${month}-${year}`;
-    const timeForFile = `${hours}-${minutes}`;
+    const dateForFile = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
+    const timeForFile = `${String(dateObj.getHours()).padStart(2, '0')}-${String(dateObj.getMinutes()).padStart(2, '0')}`;
     const fileName = `Відвантаження_${storeName}_${dateForFile}_${timeForFile}.pdf`;
 
     if (options.download !== false && typeof document !== 'undefined') {
@@ -616,10 +565,5 @@ export async function generateUnloadingReport(batchData, options = {}) {
         setTimeout(() => URL.revokeObjectURL(url), 0);
     }
 
-    return {
-        fileName,
-        blob,
-        base64,
-        bytes: pdfBytes
-    };
+    return { fileName, blob, base64, bytes: pdfBytes };
 }

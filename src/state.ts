@@ -1,4 +1,4 @@
-import { config } from './config.ts';
+import { config } from './config.js';
 
 class AppState {
     screen: string;
@@ -190,7 +190,7 @@ class DraftManager {
 
         if (!draft || !draft.items) return null;
 
-        draft.items = draft.items.filter(item => item.id !== itemId);
+        draft.items = draft.items.filter((item: any) => item.id !== itemId);
         draft.updatedAt = new Date().toISOString();
 
         if (draft.items.length === 0) {
@@ -209,7 +209,7 @@ class DraftManager {
 
         if (!draft || !draft.items) return null;
 
-        const itemIndex = draft.items.findIndex(item => item.id === itemId);
+        const itemIndex = draft.items.findIndex((item: any) => item.id === itemId);
         if (itemIndex === -1) return null;
 
         // Зберігаємо оригінальний ID та timestamp створення
@@ -226,7 +226,7 @@ class DraftManager {
         return draft;
     }
 
-    static async deleteDraft(storeName) {
+    static async deleteDraft(storeName: string) {
         await IndexedDBManager.delete('drafts', storeName);
         await IndexedDBManager.logAction('delete_draft', storeName);
     }
@@ -275,7 +275,7 @@ class PurchaseDraftManager {
 
         if (!draft || !draft.items) return null;
 
-        draft.items = draft.items.filter(item => item.id !== itemId);
+        draft.items = draft.items.filter((item: any) => item.id !== itemId);
         draft.updatedAt = new Date().toISOString();
 
         if (draft.items.length === 0) {
@@ -294,7 +294,7 @@ class PurchaseDraftManager {
 
         if (!draft || !draft.items) return null;
 
-        const itemIndex = draft.items.findIndex(item => item.id === itemId);
+        const itemIndex = draft.items.findIndex((item: any) => item.id === itemId);
         if (itemIndex === -1) return null;
 
         updatedItem.id = itemId;
@@ -486,8 +486,8 @@ class IndexedDBManager {
                 resolve(this.db);
             };
 
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
+            request.onupgradeneeded = (event: any) => {
+                const db = event.target.result as IDBDatabase;
 
                 if (!db.objectStoreNames.contains('history')) {
                     const historyStore = db.createObjectStore('history', { keyPath: 'id' });

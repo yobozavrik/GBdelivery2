@@ -1,18 +1,40 @@
+import { AppState, PurchaseDraftManager, DraftManager, InventoryManager, SecureStorageManager } from '../state.js';
+import { ToastManager, AppUIAdapter } from '../ui.js';
+
 export class FormController {
-    constructor(appState, appUI, toastManager, InputValidator, PurchaseDraftManager, DraftManager, InventoryManager, SecureApiClient, PhotoCompressor, currencyFormatter) {
+    private appState: AppState;
+    private toastManager: ToastManager;
+    private InputValidator: any;
+    private PurchaseDraftManager: typeof PurchaseDraftManager;
+    private DraftManager: typeof DraftManager;
+    private InventoryManager: typeof InventoryManager;
+    private SecureApiClient: any;
+    private SecureStorageManager: typeof SecureStorageManager;
+
+    constructor(
+        appState: AppState,
+        _appUI: AppUIAdapter,
+        toastManager: ToastManager,
+        InputValidator: any,
+        purchaseDraftManager: typeof PurchaseDraftManager,
+        draftManager: typeof DraftManager,
+        inventoryManager: typeof InventoryManager,
+        secureApiClient: any,
+        _photoCompressor: any,
+        _currencyFormatter: any,
+        secureStorageManager: typeof SecureStorageManager
+    ) {
         this.appState = appState;
-        this.appUI = appUI;
         this.toastManager = toastManager;
         this.InputValidator = InputValidator;
-        this.PurchaseDraftManager = PurchaseDraftManager;
-        this.DraftManager = DraftManager;
-        this.InventoryManager = InventoryManager;
-        this.SecureApiClient = SecureApiClient;
-        this.PhotoCompressor = PhotoCompressor;
-        this.currencyFormatter = currencyFormatter;
+        this.PurchaseDraftManager = purchaseDraftManager;
+        this.DraftManager = draftManager;
+        this.InventoryManager = inventoryManager;
+        this.SecureApiClient = secureApiClient;
+        this.SecureStorageManager = secureStorageManager;
     }
 
-    showFieldError(fieldId, message) {
+    showFieldError(fieldId: string, message: string) {
         const errorElement = document.getElementById(`${fieldId}-error`);
         if (errorElement) {
             errorElement.textContent = message;
@@ -20,7 +42,7 @@ export class FormController {
         }
     }
 
-    clearFieldError(fieldId) {
+    clearFieldError(fieldId: string) {
         const errorElement = document.getElementById(`${fieldId}-error`);
         if (errorElement) {
             errorElement.textContent = '';
@@ -28,8 +50,9 @@ export class FormController {
         }
     }
 
-    validateProductName() {
-        const value = document.getElementById('productName').value;
+    validateProductName(): boolean {
+        const element = document.getElementById('productName') as HTMLInputElement;
+        const value = element ? element.value : '';
         if (!this.InputValidator.validateProductName(value)) {
             this.showFieldError('productName', 'Назва товару повинна містити від 2 до 100 символів');
             return false;
@@ -38,8 +61,9 @@ export class FormController {
         return true;
     }
 
-    validateQuantity() {
-        const value = document.getElementById('quantity').value;
+    validateQuantity(): boolean {
+        const element = document.getElementById('quantity') as HTMLInputElement;
+        const value = element ? element.value : '';
         if (!this.InputValidator.validateQuantity(value)) {
             this.showFieldError('quantity', 'Кількість повинна бути більше 0 і не більше 10000');
             return false;
@@ -48,8 +72,9 @@ export class FormController {
         return true;
     }
 
-    validatePrice() {
-        const value = document.getElementById('pricePerUnit').value.trim();
+    validatePrice(): boolean {
+        const element = document.getElementById('pricePerUnit') as HTMLInputElement;
+        const value = element ? element.value.trim() : '';
         const isOptional = this.appState.isUnloading || this.appState.isDelivery;
 
         if (value === '') {
@@ -70,14 +95,15 @@ export class FormController {
         return true;
     }
 
-    validateLocation() {
-        const locationField = document.getElementById('location');
-        const customLocationField = document.getElementById('customLocation');
+    validateLocation(): boolean {
+        const locationField = document.getElementById('location') as HTMLSelectElement;
+        const customLocationField = document.getElementById('customLocation') as HTMLInputElement;
+        if (!locationField) return false;
         const value = locationField.value;
 
         if (value === 'Інше') {
             this.clearFieldError('location');
-            if (!this.InputValidator.validateLocation(customLocationField.value)) {
+            if (!customLocationField || !this.InputValidator.validateLocation(customLocationField.value)) {
                 this.showFieldError('customLocation', 'Локація повинна містити від 2 до 100 символів');
                 return false;
             }
@@ -95,16 +121,19 @@ export class FormController {
     }
 
     updateTotalAmount() {
-        const quantity = parseFloat(document.getElementById('quantity').value) || 0;
-        const price = parseFloat(document.getElementById('pricePerUnit').value) || 0;
+        const qEl = document.getElementById('quantity') as HTMLInputElement;
+        const pEl = document.getElementById('pricePerUnit') as HTMLInputElement;
+        const quantity = qEl ? parseFloat(qEl.value) || 0 : 0;
+        const price = pEl ? parseFloat(pEl.value) || 0 : 0;
         const total = (quantity * price).toFixed(2);
         const totalElement = document.getElementById('totalAmount');
         if (totalElement) totalElement.textContent = `${total} ₴`;
     }
 
     setupPurchaseForm() {
-        document.getElementById('purchaseForm')?.reset();
-        if (window.removePhoto) window.removePhoto();
+        const form = document.getElementById('purchaseForm') as HTMLFormElement;
+        form?.reset();
+        if ((window as any).removePhoto) (window as any).removePhoto();
 
         ['productName', 'quantity', 'pricePerUnit', 'location', 'customLocation'].forEach(id => this.clearFieldError(id));
 
@@ -112,7 +141,7 @@ export class FormController {
         const priceGroup = document.getElementById('priceGroup');
         const totalGroup = document.getElementById('totalGroup');
         const locationLabel = document.getElementById('locationLabel');
-        const locationSelect = document.getElementById('location');
+        const locationSelect = document.getElementById('location') as HTMLSelectElement;
 
         if (priceGroup) priceGroup.style.display = isUnloading ? 'none' : 'block';
         if (totalGroup) totalGroup.style.display = isUnloading ? 'none' : 'block';
@@ -126,7 +155,8 @@ export class FormController {
         if (locationSelect && this.appState.selectedStore) {
             locationSelect.value = this.appState.selectedStore;
             if (this.appState.selectedStore !== 'Інше') {
-                document.getElementById('customLocationGroup').style.display = 'none';
+                const customLocationGroup = document.getElementById('customLocationGroup');
+                if (customLocationGroup) customLocationGroup.style.display = 'none';
             }
         }
 
@@ -138,7 +168,7 @@ export class FormController {
         this.updateTotalAmount();
     }
 
-    async handleFormSubmit(event) {
+    async handleFormSubmit(event: Event) {
         event.preventDefault();
 
         const isProdValid = this.validateProductName();
@@ -151,12 +181,19 @@ export class FormController {
             return;
         }
 
-        const productName = document.getElementById('productName').value.trim();
-        const quantity = parseFloat(document.getElementById('quantity').value);
-        const unit = document.getElementById('unit').value;
-        const pricePerUnit = parseFloat(document.getElementById('pricePerUnit').value) || 0;
-        const location = document.getElementById('location').value;
-        const customLocation = document.getElementById('customLocation').value.trim();
+        const nameEl = document.getElementById('productName') as HTMLInputElement;
+        const qEl = document.getElementById('quantity') as HTMLInputElement;
+        const unitEl = document.getElementById('unit') as HTMLSelectElement;
+        const pEl = document.getElementById('pricePerUnit') as HTMLInputElement;
+        const locEl = document.getElementById('location') as HTMLSelectElement;
+        const customLocEl = document.getElementById('customLocation') as HTMLInputElement;
+
+        const productName = nameEl ? nameEl.value.trim() : '';
+        const quantity = qEl ? parseFloat(qEl.value) : 0;
+        const unit = unitEl ? unitEl.value : 'kg';
+        const pricePerUnit = pEl ? parseFloat(pEl.value) || 0 : 0;
+        const location = locEl ? locEl.value : '';
+        const customLocation = customLocEl ? customLocEl.value.trim() : '';
         const finalLocation = location === 'Інше' ? customLocation : location;
 
         const itemData = {
@@ -175,23 +212,23 @@ export class FormController {
         if (this.appState.isUnloading) {
             await this.DraftManager.addItemToDraft(finalLocation, itemData);
             this.toastManager.show('Товар додано до відвантаження', 'success');
-            if (window.controllers?.unloading) await window.controllers.unloading.showDraftView(finalLocation);
+            if ((window as any).controllers?.unloading) await (window as any).controllers.unloading.showDraftView(finalLocation);
         } else if (!this.appState.isUnloading && !this.appState.isDelivery && this.appState.selectedStore) {
             await this.PurchaseDraftManager.addItemToDraft(finalLocation, itemData);
             this.toastManager.show('Товар додано до закупки', 'success');
-            if (window.controllers?.purchase) await window.controllers.purchase.showPurchaseDraftView(finalLocation);
+            if ((window as any).controllers?.purchase) await (window as any).controllers.purchase.showPurchaseDraftView(finalLocation);
         } else {
             // Direct save for regular purchase/delivery if not using drafts
             await this.saveItemDirectly(itemData);
         }
     }
 
-    async saveItemDirectly(itemData) {
-        const saveButton = document.getElementById('saveButton');
+    async saveItemDirectly(itemData: any) {
+        const saveButton = document.getElementById('saveButton') as HTMLButtonElement;
         if (!saveButton) return;
 
-        const buttonIcon = saveButton.querySelector('.button-icon');
-        const buttonSpinner = saveButton.querySelector('.button-spinner');
+        const buttonIcon = saveButton.querySelector('.button-icon') as HTMLElement;
+        const buttonSpinner = saveButton.querySelector('.button-spinner') as HTMLElement;
 
         saveButton.disabled = true;
         if (buttonIcon) buttonIcon.style.display = 'none';
@@ -212,7 +249,7 @@ export class FormController {
             this.toastManager.show('Збережено', 'success');
             this.appState.setScreen('main');
             this.appState.setTab('history');
-            if (window.controllers?.history) await window.controllers.history.updateHistoryDisplay();
+            if ((window as any).controllers?.history) await (window as any).controllers.history.updateHistoryDisplay();
         } catch (error) {
             console.error('Save error:', error);
             this.toastManager.show('Помилка збереження', 'error');

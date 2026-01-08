@@ -1,12 +1,34 @@
+import { AppState } from '../state.js';
+import { ToastManager, AppUIAdapter, PhotoCompressor } from '../ui.js';
+import { ABTestManager } from '../ab-testing.js';
+import { SecureApiClient } from '../network.js';
+import { InputValidator } from '../validation.js';
+
 export class ReceiptController {
-    constructor(appState, appUI, toastManager, abTestManager, InputValidator, SecureApiClient, PhotoCompressor) {
+    private appState: AppState;
+    // private appUI: AppUIAdapter; // Unused
+    private toastManager: ToastManager;
+    private abTestManager: ABTestManager;
+    private InputValidator: typeof InputValidator;
+    private SecureApiClient: typeof SecureApiClient;
+    private PhotoCompressor: typeof PhotoCompressor;
+
+    constructor(
+        appState: AppState,
+        _appUI: AppUIAdapter,
+        toastManager: ToastManager,
+        abTestManager: ABTestManager,
+        inputValidator: typeof InputValidator,
+        secureApiClient: typeof SecureApiClient,
+        photoCompressor: typeof PhotoCompressor
+    ) {
         this.appState = appState;
-        this.appUI = appUI;
+        // this.appUI = appUI;
         this.toastManager = toastManager;
         this.abTestManager = abTestManager;
-        this.InputValidator = InputValidator;
-        this.SecureApiClient = SecureApiClient;
-        this.PhotoCompressor = PhotoCompressor;
+        this.InputValidator = inputValidator;
+        this.SecureApiClient = secureApiClient;
+        this.PhotoCompressor = photoCompressor;
     }
 
     stopReceiptCameraStream() {
@@ -16,7 +38,7 @@ export class ReceiptController {
         }
 
         const streamWrapper = document.getElementById('receiptCameraStreamWrapper');
-        const video = document.getElementById('receiptCameraStream');
+        const video = document.getElementById('receiptCameraStream') as HTMLVideoElement;
         const openCameraBtn = document.getElementById('openCameraBtn');
         const placeholder = document.getElementById('receiptCameraPlaceholder');
         const preview = document.getElementById('receiptPreview');
@@ -37,7 +59,7 @@ export class ReceiptController {
     async openReceiptCamera() {
         const openCameraBtn = document.getElementById('openCameraBtn');
         const streamWrapper = document.getElementById('receiptCameraStreamWrapper');
-        const video = document.getElementById('receiptCameraStream');
+        const video = document.getElementById('receiptCameraStream') as HTMLVideoElement;
         const placeholder = document.getElementById('receiptCameraPlaceholder');
         const preview = document.getElementById('receiptPreview');
 
@@ -98,7 +120,7 @@ export class ReceiptController {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         try {
-            const blob = await new Promise((resolve, reject) => {
+            const blob = await new Promise<Blob>((resolve, reject) => {
                 canvas.toBlob((result) => {
                     if (result) {
                         resolve(result);
@@ -127,7 +149,7 @@ export class ReceiptController {
         const preview = document.getElementById('receiptPreview');
         const processBtn = document.getElementById('processReceiptBtn');
         const actions = document.getElementById('receiptCameraActions');
-        const previewImage = document.getElementById('receiptPreviewImage');
+        const previewImage = document.getElementById('receiptPreviewImage') as HTMLImageElement;
         const placeholder = document.getElementById('receiptCameraPlaceholder');
         if (preview) preview.style.display = 'none';
         if (previewImage) previewImage.src = '';
@@ -136,7 +158,7 @@ export class ReceiptController {
         if (placeholder) placeholder.style.display = 'flex';
     }
 
-    applyReceiptPhotoFile(file) {
+    applyReceiptPhotoFile(file: File) {
         if (!file) return false;
 
         if (!this.InputValidator.validateFile(file)) {
@@ -147,7 +169,7 @@ export class ReceiptController {
         this.appState.setReceiptPhoto(file, this.appState.receiptPhotoSource);
 
         const preview = document.getElementById('receiptPreview');
-        const previewImage = document.getElementById('receiptPreviewImage');
+        const previewImage = document.getElementById('receiptPreviewImage') as HTMLImageElement;
         const processBtn = document.getElementById('processReceiptBtn');
         const actions = document.getElementById('receiptCameraActions');
         const placeholder = document.getElementById('receiptCameraPlaceholder');
@@ -162,6 +184,7 @@ export class ReceiptController {
         if (processBtn) processBtn.style.display = 'block';
         if (actions) actions.style.display = 'flex';
         if (placeholder) placeholder.style.display = 'none';
+        return true;
     }
 
     retakeReceiptPhoto() {
@@ -179,32 +202,38 @@ export class ReceiptController {
     }
 
     async processReceipt() {
-        if (!this.appState.receiptPhotoFile) {
-            this.toastManager.show('Спочатку зробіть фото чека', 'error');
-            return;
-        }
-
-        const processBtn = document.getElementById('processReceiptBtn');
+        const processBtn = document.getElementById('processReceiptBtn') as HTMLButtonElement;
         const scanningStatus = document.getElementById('scanningStatus');
         const receiptPreview = document.getElementById('receiptPreview');
+        const statusText = scanningStatus ? scanningStatus.querySelector('p') : null;
 
         if (processBtn) processBtn.disabled = true;
         if (scanningStatus) scanningStatus.style.display = 'block';
         if (receiptPreview) receiptPreview.style.display = 'none';
 
-        const statusText = scanningStatus ? scanningStatus.querySelector('p') : null;
-
         try {
+            const originalFile = this.appState.receiptPhotoFile as File | null;
+            if (!originalFile) {
+                if (processBtn) processBtn.disabled = false;
+                if (scanningStatus) scanningStatus.style.display = 'none';
+                if (receiptPreview) receiptPreview.style.display = 'block';
+                this.toastManager.show('Спочатку зробіть фото чека', 'error');
+                return;
+            }
+
             if (statusText) statusText.textContent = 'Оптимізація фото перед відправкою...';
 
-            let fileToSend = this.appState.receiptPhotoFile;
+            let fileToSend: File = originalFile;
 
             try {
-                const compressedBlob = await this.PhotoCompressor.compress(this.appState.receiptPhotoFile);
+                const compressedResult = await this.PhotoCompressor.compress(originalFile);
 
-                if (compressedBlob && compressedBlob.size > 0 && compressedBlob.size < this.appState.receiptPhotoFile.size) {
-                    const compressedFile = new File([compressedBlob], this.appState.receiptPhotoFile.name || `receipt-${Date.now()}.jpg`, {
-                        type: compressedBlob.type || this.appState.receiptPhotoFile.type || 'image/jpeg'
+                if (compressedResult && compressedResult.size > 0 && compressedResult.size < originalFile.size) {
+                    const originalName = originalFile.name || `receipt-${Date.now()}.jpg`;
+                    const originalType = originalFile.type || 'image/jpeg';
+
+                    const compressedFile = new File([compressedResult], originalName, {
+                        type: compressedResult.type || originalType
                     });
 
                     fileToSend = compressedFile;
@@ -218,18 +247,18 @@ export class ReceiptController {
             const aiVariant = this.abTestManager.getVariant('ai-scan-optimization') || 'variantA';
             const metadata = {
                 source: this.appState.receiptPhotoSource || 'unknown',
-                originalFilename: this.appState.receiptPhotoFile.name || null,
-                originalSize: this.appState.receiptPhotoFile.size,
+                originalFilename: originalFile.name || null,
+                originalSize: originalFile.size,
                 processedSize: fileToSend.size,
                 capturedAt: new Date().toISOString(),
-                devicePixelRatio: window.devicePixelRatio,
+                devicePixelRatio: (window as any).devicePixelRatio,
                 userAgent: navigator.userAgent,
                 variant: aiVariant
             };
 
             const { payload, urlUsed } = await this.SecureApiClient.scanReceipt(fileToSend, metadata);
 
-            let recognizedItems = [];
+            let recognizedItems: any[] = [];
             const response = payload || {};
             const candidateArrays = [
                 response.items,
@@ -279,8 +308,8 @@ export class ReceiptController {
                 });
             }
 
-            if (window.showRecognizedItemsScreen) window.showRecognizedItemsScreen();
-        } catch (error) {
+            if ((window as any).showRecognizedItemsScreen) (window as any).showRecognizedItemsScreen();
+        } catch (error: any) {
             console.error('Receipt scan error:', error);
             let errorMessage = 'Помилка розпізнавання чека';
             if (error?.status === 408 || error?.name === 'AbortError') {
@@ -307,7 +336,7 @@ export class ReceiptController {
         }
     }
 
-    normalizeRecognizedReceiptItems(rawItems) {
+    normalizeRecognizedReceiptItems(rawItems: any[]): any[] {
         if (!Array.isArray(rawItems)) return [];
         const now = new Date().toISOString();
         return rawItems.map((item) => {
@@ -325,7 +354,7 @@ export class ReceiptController {
             if (!sanitizedName || sanitizedName.length < 2 || quantity <= 0) return null;
 
             return {
-                id: crypto.randomUUID(),
+                id: (crypto as any).randomUUID ? (crypto as any).randomUUID() : Math.random().toString(36).substring(2),
                 productName: sanitizedName,
                 quantity: parseFloat(quantity.toFixed(3)),
                 unit: this.InputValidator.sanitizeString(item?.unit || 'piece') || 'piece',
@@ -338,18 +367,18 @@ export class ReceiptController {
         }).filter(Boolean);
     }
 
-    parseMetroReceipt(rawText) {
-        const items = [];
+    parseMetroReceipt(rawText: string): any[] {
+        const items: any[] = [];
         const lines = rawText.split('\n');
         const itemRegex = /^(?:[\d\s]+)?(.+?)\s+(\d+([.,]\d{1,3})?)\s*(?:шт|кг)\s*[*xх]\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})$/i;
         const simplerRegex = /^(?:[\d\s]+)?(.+?)\s+(\d+([.,]\d{1,3})?)\s+(?:\d+([.,]\d{1,3})?)\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})$/i;
 
         for (const line of lines) {
             const trimmedLine = line.trim();
-            let match = trimmedLine.match(itemRegex) || trimmedLine.match(simplerRegex);
+            const match = trimmedLine.match(itemRegex) || trimmedLine.match(simplerRegex);
             if (match) {
                 try {
-                    let productName = match[1].trim().replace(/-\s*$/, '').trim();
+                    const productName = match[1].trim().replace(/-\s*$/, '').trim();
                     if (productName.length < 3) continue;
                     const quantity = parseFloat(match[2].replace(',', '.'));
                     const pricePerUnit = parseFloat((match[4] || match[5]).replace(',', '.'));

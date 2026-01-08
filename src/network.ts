@@ -1,37 +1,28 @@
 import { config } from './config.js';
 
+interface ApiError extends Error {
+    status?: number;
+    body?: string;
+    url?: string;
+}
+
 const FALLBACK_ERROR_SIGNATURES = [
     'webhook "POST deliverygb" is not registered',
     'webhook "POST receipt-scan" is not registered'
 ];
 
-const sanitizeMalformedJson = (text) => {
-    if (typeof text !== 'string') {
-        return text;
-    }
-
+const sanitizeMalformedJson = (text: string): string => {
     let sanitized = text;
-
     sanitized = sanitized.replace(/"items"\s*:\s*,/g, '"items": [],');
     sanitized = sanitized.replace(/"recognizedItems"\s*:\s*,/g, '"recognizedItems": [],');
-
     return sanitized;
 };
 
-const parseJsonSafely = (text) => {
-    if (!text) {
-        return null;
-    }
-
-    if (typeof text !== 'string') {
-        return text;
-    }
+const parseJsonSafely = (text: string | null): any => {
+    if (!text) return null;
 
     const trimmed = text.trim();
-
-    if (!trimmed) {
-        return null;
-    }
+    if (!trimmed) return null;
 
     try {
         return JSON.parse(trimmed);
@@ -40,7 +31,6 @@ const parseJsonSafely = (text) => {
     }
 
     const sanitized = sanitizeMalformedJson(trimmed);
-
     if (sanitized !== trimmed) {
         try {
             return JSON.parse(sanitized);
@@ -52,24 +42,17 @@ const parseJsonSafely = (text) => {
     return trimmed;
 };
 
-const shouldRetryWithTestWebhook = (error) => {
-    if (!error || error.status !== 404) {
-        return false;
-    }
+const shouldRetryWithTestWebhook = (error: ApiError): boolean => {
+    if (!error || error.status !== 404) return false;
 
-    const body = typeof error.body === 'string' ? error.body : '';
-
-    if (!body) {
-        return true;
-    }
+    const body = error.body || '';
+    if (!body) return true;
 
     try {
         const parsed = JSON.parse(body);
         const message = typeof parsed === 'string'
             ? parsed
-            : [parsed?.message, parsed?.error, parsed?.body]
-                .filter(Boolean)
-                .join(' ');
+            : [parsed?.message, parsed?.error, parsed?.body].filter(Boolean).join(' ');
 
         return FALLBACK_ERROR_SIGNATURES.some(signature => message.includes(signature))
             || message.includes('requested webhook');
@@ -79,7 +62,7 @@ const shouldRetryWithTestWebhook = (error) => {
     }
 };
 
-const postJsonToWebhook = async (url, payload) => {
+const postJsonToWebhook = async (url: string, payload: any): Promise<any> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -96,7 +79,7 @@ const postJsonToWebhook = async (url, payload) => {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            const error = new Error(`HTTP ${response.status}`);
+            const error = new Error(`HTTP ${response.status}`) as ApiError;
             error.status = response.status;
             error.body = text;
             error.url = url;
@@ -104,10 +87,10 @@ const postJsonToWebhook = async (url, payload) => {
         }
 
         return parseJsonSafely(text);
-    } catch (error) {
+    } catch (error: any) {
         clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
-            const abortError = new Error('Request timed out');
+            const abortError = new Error('Request timed out') as ApiError;
             abortError.status = 408;
             throw abortError;
         }
@@ -115,7 +98,7 @@ const postJsonToWebhook = async (url, payload) => {
     }
 };
 
-const postFormDataToWebhook = async (url, formData, timeout = 45000) => {
+const postFormDataToWebhook = async (url: string, formData: FormData, timeout: number = 45000): Promise<any> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -131,7 +114,7 @@ const postFormDataToWebhook = async (url, formData, timeout = 45000) => {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            const error = new Error(`HTTP ${response.status}`);
+            const error = new Error(`HTTP ${response.status}`) as ApiError;
             error.status = response.status;
             error.body = text;
             error.url = url;
@@ -139,91 +122,67 @@ const postFormDataToWebhook = async (url, formData, timeout = 45000) => {
         }
 
         return parseJsonSafely(text);
-    } catch (error) {
+    } catch (error: any) {
         clearTimeout(timeoutId);
-
         if (error.name === 'AbortError') {
-            const abortError = new Error('Request timed out');
+            const abortError = new Error('Request timed out') as ApiError;
             abortError.status = 408;
             throw abortError;
         }
-
         throw error;
     }
 };
 
-const sendFormDataWithFallback = async (formDataFactory, primaryUrl, fallbackUrl = null) => {
-    const urlsToTry = [primaryUrl].filter(Boolean);
-
+const sendFormDataWithFallback = async (formDataFactory: () => FormData, primaryUrl: string, fallbackUrl: string | null = null): Promise<{ payload: any, urlUsed: string }> => {
+    const urlsToTry = [primaryUrl].filter(Boolean) as string[];
     if (fallbackUrl && fallbackUrl !== primaryUrl) {
         urlsToTry.push(fallbackUrl);
     }
 
     let lastError = null;
-
     for (let index = 0; index < urlsToTry.length; index += 1) {
         const url = urlsToTry[index];
-
         try {
             console.log('📡 Відправка чека на n8n вебхук:', url);
             const payload = await postFormDataToWebhook(url, formDataFactory());
             console.log('✅ Отримано відповідь від n8n вебхука:', url);
             return { payload, urlUsed: url };
-        } catch (error) {
+        } catch (error: any) {
             lastError = error;
-
-            const canRetry = index === 0
-                && fallbackUrl
-                && fallbackUrl !== primaryUrl
-                && (error.status === 404 || shouldRetryWithTestWebhook(error));
-
-            if (!canRetry) {
-                break;
-            }
-
+            const canRetry = index === 0 && fallbackUrl && fallbackUrl !== primaryUrl && (error.status === 404 || shouldRetryWithTestWebhook(error));
+            if (!canRetry) break;
             console.warn('n8n вебхук недоступний, використовую резервний URL:', fallbackUrl, error);
         }
     }
-
     throw lastError;
 };
 
-const sendWithFallback = async (payload) => {
+const sendWithFallback = async (payload: any): Promise<any> => {
     const shouldAllowFallback = !config.isTestMode && config.N8N_WEBHOOK_URL !== config.testWebhookUrl;
     const urlsToTry = [config.N8N_WEBHOOK_URL];
-
-    if (shouldAllowFallback) {
+    if (shouldAllowFallback && config.testWebhookUrl) {
         urlsToTry.push(config.testWebhookUrl);
     }
 
     let lastError = null;
-
     for (let index = 0; index < urlsToTry.length; index += 1) {
         const url = urlsToTry[index];
-
+        if (!url) continue;
         try {
-            if (index > 0) {
-                console.warn('Retrying with backup webhook URL:', url);
-            }
+            if (index > 0) console.warn('Retrying with backup webhook URL:', url);
             return await postJsonToWebhook(url, payload);
-        } catch (error) {
+        } catch (error: any) {
             lastError = error;
-
             const canRetry = index === 0 && shouldAllowFallback && shouldRetryWithTestWebhook(error);
-            if (!canRetry) {
-                break;
-            }
+            if (!canRetry) break;
         }
     }
-
     throw lastError;
 };
 
-class SecureApiClient {
-    static async sendPurchase(data) {
-        // Photo is already Base64 encoded in the data object
+export class SecureApiClient {
+    static async sendPurchase(data: any): Promise<any> {
         const payload = { ...data };
-
         try {
             return await sendWithFallback(payload);
         } catch (error) {
@@ -232,18 +191,11 @@ class SecureApiClient {
         }
     }
 
-    static async scanReceipt(imageFile, metadata = {}) {
-        if (!imageFile) {
-            throw new Error('Не вибрано фото для розпізнавання');
-        }
+    static async scanReceipt(imageFile: File, metadata: any = {}): Promise<{ payload: any, urlUsed: string }> {
+        if (!imageFile) throw new Error('Не вибрано фото для розпізнавання');
 
-        const primaryUrl = config.isTestMode
-            ? config.receiptTestWebhookUrl
-            : config.receiptProductionWebhookUrl;
-
-        const fallbackUrl = config.isTestMode
-            ? null
-            : config.receiptTestWebhookUrl;
+        const primaryUrl = config.isTestMode ? config.receiptTestWebhookUrl : config.receiptProductionWebhookUrl;
+        const fallbackUrl = config.isTestMode ? null : config.receiptTestWebhookUrl;
 
         const normalizedMetadata = {
             ...metadata,
@@ -252,12 +204,9 @@ class SecureApiClient {
 
         const formDataFactory = () => {
             const formData = new FormData();
-            const fileName = imageFile.name
-                || `receipt-${Date.now()}.${(imageFile.type || 'image/jpeg').split('/')[1] || 'jpg'}`;
-
+            const fileName = imageFile.name || `receipt-${Date.now()}.jpg`;
             formData.append('file', imageFile, fileName);
             formData.append('metadata', JSON.stringify(normalizedMetadata));
-
             return formData;
         };
 
@@ -269,14 +218,12 @@ class SecureApiClient {
         }
     }
 
-    static async sendUnloadingBatch(storeName, items) {
-        const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
-        const totalItems = items.length;
-
+    static async sendUnloadingBatch(storeName: string, items: any[]): Promise<any> {
+        const totalAmount = items.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
         const payload = {
             type: 'Відвантаження',
             storeName,
-            totalItems,
+            totalItems: items.length,
             totalAmount: Number(totalAmount.toFixed(2)),
             items: items.map(item => ({
                 productName: item.productName,
@@ -291,23 +238,15 @@ class SecureApiClient {
             })),
             createdAt: new Date().toISOString()
         };
-
-        try {
-            return await sendWithFallback(payload);
-        } catch (error) {
-            console.error('Batch API Error:', error);
-            throw error;
-        }
+        return await sendWithFallback(payload);
     }
 
-    static async sendPurchaseBatch(locationName, items) {
-        const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
-        const totalItems = items.length;
-
+    static async sendPurchaseBatch(locationName: string, items: any[]): Promise<any> {
+        const totalAmount = items.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
         const payload = {
             type: 'Закупка',
             locationName,
-            totalItems,
+            totalItems: items.length,
             totalAmount: Number(totalAmount.toFixed(2)),
             items: items.map(item => ({
                 productName: item.productName,
@@ -321,62 +260,35 @@ class SecureApiClient {
             })),
             createdAt: new Date().toISOString()
         };
-
-        try {
-            return await sendWithFallback(payload);
-        } catch (error) {
-            console.error('Purchase Batch API Error:', error);
-            throw error;
-        }
+        return await sendWithFallback(payload);
     }
 
-    static async sendUnloadingBatchWithPDF(storeName, items, pdfBlob) {
-        if (!this.validateInput(storeName) || !Array.isArray(items) || items.length === 0) {
-            throw new Error('Неправильні дані для відправки');
-        }
-
-        if (!pdfBlob || !(pdfBlob instanceof Blob)) {
-            throw new Error('PDF файл відсутній або невалідний');
-        }
+    static async sendUnloadingBatchWithPDF(storeName: string, items: any[], pdfBlob: Blob): Promise<any> {
+        if (!storeName || !Array.isArray(items) || items.length === 0) throw new Error('Неправильні дані для відправки');
+        if (!pdfBlob || !(pdfBlob instanceof Blob)) throw new Error('PDF файл відсутній або невалідний');
 
         const webhookUrl = config.N8N_WEBHOOK_URL;
-        if (!webhookUrl) {
-            throw new Error('URL вебхука не налаштовано');
-        }
+        if (!webhookUrl) throw new Error('URL вебхука не налаштовано');
 
-        // Конвертируем PDF в base64
-        const pdfBase64 = await new Promise((resolve, reject) => {
+        const pdfBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const base64 = reader.result.split(',')[1]; // Убираем префикс data:...;base64,
-                resolve(base64);
+                const res = reader.result as string;
+                resolve(res.split(',')[1]);
             };
             reader.onerror = reject;
             reader.readAsDataURL(pdfBlob);
         });
 
-        const submittedAt = new Date();
         const totalAmount = items.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
-        const totalWeight = items.reduce((sum, item) => {
-            if (item.unit === 'kg') {
-                return sum + (Number(item.quantity) || 0);
-            }
-            return sum;
-        }, 0);
+        const totalWeight = items.reduce((sum, item) => item.unit === 'kg' ? sum + (Number(item.quantity) || 0) : sum, 0);
 
-        // Формат имени файла
-        const day = String(submittedAt.getDate()).padStart(2, '0');
-        const month = String(submittedAt.getMonth() + 1).padStart(2, '0');
-        const year = submittedAt.getFullYear();
-        const hours = String(submittedAt.getHours()).padStart(2, '0');
-        const minutes = String(submittedAt.getMinutes()).padStart(2, '0');
-        const pdfFileName = `Відвантаження_${storeName}_${day}-${month}-${year}_${hours}-${minutes}.pdf`;
+        const now = new Date();
+        const pdfFileName = `Відвантаження_${storeName}_${now.toISOString().replace(/[:.]/g, '-')}.pdf`;
 
         const payload = {
             type: 'Відвантаження',
             storeName,
-            date: submittedAt.toLocaleDateString('uk-UA'),
-            time: submittedAt.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }),
             totalItems: items.length,
             totalAmount: Number(totalAmount.toFixed(2)),
             totalWeight: Number(totalWeight.toFixed(2)),
@@ -384,20 +296,19 @@ class SecureApiClient {
                 productName: item.productName,
                 quantity: Number(item.quantity),
                 unit: item.unit,
-                source: item.source || 'purchase',
                 pricePerUnit: Number(item.pricePerUnit),
                 totalAmount: Number(item.totalAmount),
                 timestamp: item.timestamp
             })),
-            submittedAt: submittedAt.toISOString(),
-            pdfBase64: pdfBase64,
-            pdfFileName: pdfFileName
+            submittedAt: now.toISOString(),
+            pdfBase64,
+            pdfFileName
         };
 
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 секунд для PDF
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
+        try {
             const response = await fetch(webhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -405,55 +316,31 @@ class SecureApiClient {
                 signal: controller.signal,
                 mode: 'cors'
             });
-
             clearTimeout(timeoutId);
-
             const text = await response.text();
-
-            if (!response.ok) {
-                const error = new Error(`HTTP ${response.status}`);
-                error.status = response.status;
-                error.body = text;
-                throw error;
-            }
-
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${text}`);
             return parseJsonSafely(text);
+        } catch (error: any) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
+    }
+
+    static async generateAISummary(historyText: string): Promise<string> {
+        if (!config.GEMINI_API_URL) throw new Error('AI API not configured');
+        const prompt = `Проаналізуй звіти за день:\n\n${historyText}\n\nЗроби короткий підсумок українською.`;
+        try {
+            const response = await fetch(config.GEMINI_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            if (!response.ok) throw new Error('AI request failed');
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Не вдалося згенерувати підсумок';
         } catch (error) {
-            if (error.name === 'AbortError') {
-                const abortError = new Error('Request timed out (PDF upload)');
-                abortError.status = 408;
-                throw abortError;
-            }
-            console.error('Batch with PDF API Error:', error);
+            console.error('AI Summary error:', error);
             throw error;
         }
     }
-
-    static async generateAISummary(historyText) {
-        if (!config.GEMINI_API_URL) {
-            throw new Error('AI API not configured');
-        }
-
-        const prompt = `Проаналізуй денний звіт закупівель та створи структурований підсумок українською мовою:\n\n${historyText}\n\nВключи: загальну суму витрат, кількість операцій, топ-3 товари, рекомендації.`;
-
-        const response = await fetch(config.GEMINI_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('AI API request failed');
-        }
-
-        const result = await response.json();
-            console.error('Receipt webhook error:', error);
-            throw error;
-        }
-    }
-
-export { SecureApiClient };
+}

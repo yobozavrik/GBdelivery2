@@ -3,16 +3,31 @@
  * A/B Test 2: List Optimization
  */
 
+interface ListOptions {
+    pageSize?: number;
+    useVirtualScroll?: boolean;
+    itemHeight?: number;
+    [key: string]: any;
+}
+
 class OptimizedListRenderer {
-    constructor(container, options = {}) {
+    protected container: HTMLElement;
+    protected options: Required<ListOptions>;
+    protected data: any[];
+    protected currentPage: number;
+    protected totalPages: number;
+    protected renderedItems: any[];
+    protected scrollContainer: HTMLElement | null;
+
+    constructor(container: HTMLElement, options: ListOptions = {}) {
         this.container = container;
         this.options = {
             pageSize: options.pageSize || 10,
-            useVirtualScroll: options.useVirtualScroll || true,
+            useVirtualScroll: options.useVirtualScroll !== undefined ? options.useVirtualScroll : true,
             itemHeight: options.itemHeight || 120,
             ...options
-        };
-        
+        } as Required<ListOptions>;
+
         this.data = [];
         this.currentPage = 1;
         this.totalPages = 1;
@@ -23,7 +38,7 @@ class OptimizedListRenderer {
     /**
      * Встановлення даних для відображення
      */
-    setData(data) {
+    setData(data: any[]) {
         this.data = Array.isArray(data) ? data : [];
         this.totalPages = Math.ceil(this.data.length / this.options.pageSize);
         this.currentPage = 1;
@@ -53,8 +68,8 @@ class OptimizedListRenderer {
 
         const fragment = document.createDocumentFragment();
 
-        itemsToRender.forEach((item, index) => {
-            const element = this.createItemElement(item, startIndex + index);
+        itemsToRender.forEach((_item, index) => {
+            const element = this.createItemElement(_item, startIndex + index);
             fragment.appendChild(element);
         });
 
@@ -73,10 +88,7 @@ class OptimizedListRenderer {
         this.renderPaginated();
     }
 
-    /**
-     * Створення елемента товару
-     */
-    createItemElement(item, index) {
+    createItemElement(_item: any, index: number): HTMLElement {
         // Це буде перевизначено в конкретних імплементаціях
         const div = document.createElement('div');
         div.className = 'optimized-list-item';
@@ -88,7 +100,10 @@ class OptimizedListRenderer {
      * Рендеринг контролів pagination
      */
     renderPaginationControls() {
-        const existingControls = this.container.parentElement.querySelector('.pagination-controls');
+        const parent = this.container.parentElement;
+        if (!parent) return;
+
+        const existingControls = parent.querySelector('.pagination-controls');
         if (existingControls) {
             existingControls.remove();
         }
@@ -103,7 +118,7 @@ class OptimizedListRenderer {
         const prevBtn = document.createElement('button');
         prevBtn.textContent = '← Назад';
         prevBtn.disabled = this.currentPage === 1;
-        prevBtn.addEventListener('click', () => this.goToPage(this.currentPage - 1));
+        prevBtn.onclick = () => this.goToPage(this.currentPage - 1);
         controls.appendChild(prevBtn);
 
         const pageInfo = document.createElement('span');
@@ -114,16 +129,16 @@ class OptimizedListRenderer {
         const nextBtn = document.createElement('button');
         nextBtn.textContent = 'Далі →';
         nextBtn.disabled = this.currentPage === this.totalPages;
-        nextBtn.addEventListener('click', () => this.goToPage(this.currentPage + 1));
+        nextBtn.onclick = () => this.goToPage(this.currentPage + 1);
         controls.appendChild(nextBtn);
 
-        this.container.parentElement.appendChild(controls);
+        parent.appendChild(controls);
     }
 
     /**
      * Перехід на сторінку
      */
-    goToPage(page) {
+    goToPage(page: number) {
         if (page < 1 || page > this.totalPages) {
             return;
         }
@@ -132,16 +147,16 @@ class OptimizedListRenderer {
         this.render();
 
         // Track event
-        if (window.abTestManager && window.abTestManager.isTestActive('list-optimization')) {
-            window.abTestManager.trackEvent('list-optimization', 'page-changed', { page });
+        if ((window as any).abTestManager && (window as any).abTestManager.isTestActive('list-optimization')) {
+            (window as any).abTestManager.trackEvent('list-optimization', 'page-changed', { page });
         }
     }
 
     /**
      * Прокрутка до елемента
      */
-    scrollToItem(index) {
-        const element = this.container.children[index];
+    scrollToItem(index: number) {
+        const element = this.container.children[index] as HTMLElement;
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -152,14 +167,13 @@ class OptimizedListRenderer {
  * Оптимізований рендерер для чернеток відвантаження
  */
 export class OptimizedDraftsRenderer extends OptimizedListRenderer {
-    createItemElement(item, index) {
+    createItemElement(item: any, _index: number): HTMLElement {
         const card = document.createElement('div');
         card.className = 'draft-card glassmorphism optimized-item';
 
         const info = document.createElement('div');
         info.className = 'draft-card-info';
 
-        // Support both storeName and locationName for purchase drafts
         const name = document.createElement('div');
         name.className = 'draft-card-store';
         name.textContent = item.storeName || item.locationName || 'Чернетка';
@@ -191,12 +205,13 @@ export class OptimizedDraftsRenderer extends OptimizedListRenderer {
         card.appendChild(info);
         card.appendChild(actions);
 
-        // Store callback references
         if (item.onView) {
-            card.addEventListener('click', item.onView);
-            viewBtn.addEventListener('click', item.onView);
+            card.onclick = (e) => {
+                if (e.target !== deleteBtn) item.onView(e);
+            };
+            viewBtn.onclick = item.onView;
         }
-        if (item.onDelete) deleteBtn.addEventListener('click', item.onDelete);
+        if (item.onDelete) deleteBtn.onclick = item.onDelete;
 
         return card;
     }
@@ -206,7 +221,7 @@ export class OptimizedDraftsRenderer extends OptimizedListRenderer {
  * Оптимізований рендерер для товарів у чернетці
  */
 export class OptimizedDraftItemsRenderer extends OptimizedListRenderer {
-    createItemElement(item, index) {
+    createItemElement(item: any, _index: number): HTMLElement {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'draft-item glassmorphism optimized-item';
 
@@ -218,7 +233,7 @@ export class OptimizedDraftItemsRenderer extends OptimizedListRenderer {
             photoPreview.className = 'draft-item-photo';
             photoPreview.src = item.photo;
             photoPreview.alt = 'Фото товару';
-            photoPreview.loading = 'lazy'; // Lazy loading
+            photoPreview.loading = 'lazy';
             info.appendChild(photoPreview);
         }
 
@@ -245,7 +260,7 @@ export class OptimizedDraftItemsRenderer extends OptimizedListRenderer {
             const viewBtn = document.createElement('button');
             viewBtn.className = 'draft-item-view';
             viewBtn.innerHTML = '<i data-lucide="eye"></i>';
-            viewBtn.addEventListener('click', item.onView);
+            viewBtn.onclick = item.onView;
             actions.appendChild(viewBtn);
         }
 
@@ -253,7 +268,7 @@ export class OptimizedDraftItemsRenderer extends OptimizedListRenderer {
             const editBtn = document.createElement('button');
             editBtn.className = 'draft-item-edit';
             editBtn.innerHTML = '<i data-lucide="edit"></i>';
-            editBtn.addEventListener('click', item.onEdit);
+            editBtn.onclick = item.onEdit;
             actions.appendChild(editBtn);
         }
 
@@ -261,7 +276,7 @@ export class OptimizedDraftItemsRenderer extends OptimizedListRenderer {
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'draft-item-delete';
             deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
-            deleteBtn.addEventListener('click', item.onDelete);
+            deleteBtn.onclick = item.onDelete;
             actions.appendChild(deleteBtn);
         }
 
@@ -276,7 +291,15 @@ export class OptimizedDraftItemsRenderer extends OptimizedListRenderer {
  * Performance benchmark
  */
 export class PerformanceBenchmark {
-    constructor(testName) {
+    private testName: string;
+    private metrics: {
+        renderStart: number | null;
+        renderEnd: number | null;
+        itemsCount: number;
+        memoryUsage: number | null;
+    };
+
+    constructor(testName: string) {
         this.testName = testName;
         this.metrics = {
             renderStart: null,
@@ -288,31 +311,29 @@ export class PerformanceBenchmark {
 
     start() {
         this.metrics.renderStart = performance.now();
-        if ('memory' in performance) {
-            this.metrics.memoryUsage = performance.memory.usedJSHeapSize;
+        if ('memory' in (performance as any)) {
+            this.metrics.memoryUsage = (performance as any).memory.usedJSHeapSize;
         }
     }
 
-    end(itemsCount) {
+    end(itemsCount: number) {
         this.metrics.renderEnd = performance.now();
         this.metrics.itemsCount = itemsCount;
 
-        const duration = this.metrics.renderEnd - this.metrics.renderStart;
+        const duration = (this.metrics.renderEnd || 0) - (this.metrics.renderStart || 0);
         const itemsPerSecond = (itemsCount / duration) * 1000;
 
         const result = {
             testName: this.testName,
             duration: Math.round(duration),
-            itemsCount,
             itemsPerSecond: Math.round(itemsPerSecond),
             ...this.metrics
         };
 
         console.log('📊 Performance:', result);
 
-        // Track to analytics
-        if (window.abTestManager) {
-            window.abTestManager.trackEvent(this.testName, 'render-complete', result);
+        if ((window as any).abTestManager) {
+            (window as any).abTestManager.trackEvent(this.testName, 'render-complete', result);
         }
 
         return result;
