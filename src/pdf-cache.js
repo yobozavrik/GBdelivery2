@@ -4,29 +4,29 @@
  * A/B Test 5: PDF Optimization
  */
 
-import { IndexedDBManager } from './state.js';
-
 class PDFCacheManager {
-    private cacheKey: string;
-    private fallbackFontUrl: string;
-
     constructor() {
         this.cacheKey = 'pdf_font_cache_v1';
+        this.cachedFontBytes = null;
         this.fallbackFontUrl = 'https://cdn.jsdelivr.net/npm/@fontsource/roboto@4.5.8/files/roboto-cyrillic-400-normal.woff';
     }
 
     /**
      * Завантажити шрифт (з кешу якщо можливо)
      */
-    async loadFontBytes(): Promise<Uint8Array> {
+    async loadFontBytes() {
+        // Спробувати завантажити з кешу
         const cached = await this.getCachedFont();
         if (cached) {
             console.log('✅ Font loaded from cache');
             return cached;
         }
 
+        // Завантажити з мережі
         console.log('📥 Loading font from network...');
         const fontBytes = await this.fetchFontFromNetwork();
+
+        // Зберегти в кеш
         await this.cacheFont(fontBytes);
 
         return fontBytes;
@@ -35,12 +35,12 @@ class PDFCacheManager {
     /**
      * Отримати шрифт з IndexedDB кешу
      */
-    async getCachedFont(): Promise<Uint8Array | null> {
+    async getCachedFont() {
         try {
             const data = await IndexedDBManager.get('cache', this.cacheKey);
             if (data && data.fontBytes) {
-                const uint8Array = new Uint8Array(data.fontBytes);
-                return uint8Array;
+                this.cachedFontBytes = data.fontBytes;
+                return new Uint8Array(data.fontBytes);
             }
         } catch (error) {
             console.warn('Failed to load cached font:', error);
@@ -51,9 +51,9 @@ class PDFCacheManager {
     /**
      * Завантажити шрифт з мережі
      */
-    async fetchFontFromNetwork(): Promise<Uint8Array> {
+    async fetchFontFromNetwork() {
         const response = await fetch(this.fallbackFontUrl);
-
+        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
@@ -65,17 +65,18 @@ class PDFCacheManager {
     /**
      * Зберегти шрифт в IndexedDB кеш
      */
-    async cacheFont(fontBytes: Uint8Array): Promise<void> {
+    async cacheFont(fontBytes) {
         try {
             const data = {
                 key: this.cacheKey,
-                fontBytes: Array.from(fontBytes),
+                fontBytes: Array.from(fontBytes), // Convert to regular array for storage
                 cachedAt: Date.now(),
                 version: 1
             };
 
             await IndexedDBManager.put('cache', data);
-
+            this.cachedFontBytes = fontBytes;
+            
             console.log('✅ Font cached successfully');
         } catch (error) {
             console.error('Failed to cache font:', error);
@@ -85,9 +86,10 @@ class PDFCacheManager {
     /**
      * Очистити кеш
      */
-    async clearCache(): Promise<void> {
+    async clearCache() {
         try {
             await IndexedDBManager.delete('cache', this.cacheKey);
+            this.cachedFontBytes = null;
             console.log('🧹 Font cache cleared');
         } catch (error) {
             console.error('Failed to clear cache:', error);
@@ -97,7 +99,7 @@ class PDFCacheManager {
     /**
      * Отримати статистику кешу
      */
-    async getCacheStats(): Promise<{ cached: boolean; version?: number; ageInMs?: number; ageInMinutes?: number; sizeInMB?: string; cachedAt?: Date }> {
+    async getCacheStats() {
         try {
             const data = await IndexedDBManager.get('cache', this.cacheKey);
             if (!data) {
@@ -105,7 +107,7 @@ class PDFCacheManager {
             }
 
             const age = Date.now() - data.cachedAt;
-            const sizeInMB = data.fontBytes ? (data.fontBytes.length / 1024 / 1024).toFixed(2) : '0';
+            const sizeInMB = data.fontBytes ? (data.fontBytes.length / 1024 / 1024).toFixed(2) : 0;
 
             return {
                 cached: true,
@@ -128,34 +130,44 @@ export const pdfCacheManager = new PDFCacheManager();
 /**
  * Оптимізована генерація PDF (з кешуванням)
  */
-export async function generatePDFOptimized(batchData: any, options: any = {}): Promise<any> {
+export async function generatePDFOptimized(batchData, options = {}) {
     const startTime = performance.now();
-    const abTestManager = (window as any).abTestManager;
-    const useCaching = abTestManager?.getVariant('pdf-optimization') === 'variantB';
+    const useCaching = window.abTestManager?.getVariant('pdf-optimization') === 'variantB';
 
     console.log('📄 Starting PDF generation (optimized:', useCaching, ')');
 
     try {
+        // Load font from cache if available
+        let fontBytes;
         if (useCaching) {
-            await pdfCacheManager.loadFontBytes();
+            fontBytes = await pdfCacheManager.loadFontBytes();
         } else {
-            await pdfCacheManager.fetchFontFromNetwork();
+            // Load without cache (control variant)
+            fontBytes = await pdfCacheManager.fetchFontFromNetwork();
         }
 
         const fontBytesLoadTime = performance.now() - startTime;
         console.log(`📥 Font loaded in ${Math.round(fontBytesLoadTime)}ms (cached: ${useCaching})`);
 
+        // Continue with PDF generation using fontBytes
+        // This is a placeholder - actual generation is in src/pdf.js
         const generationStartTime = performance.now();
+        
+        // Import and use the PDF generation function
         const { generateUnloadingReport } = await import('./pdf.js');
         const result = await generateUnloadingReport(batchData, options);
-
+        
         const totalTime = performance.now() - startTime;
         const generationTime = performance.now() - generationStartTime;
 
         console.log('✅ PDF generated successfully');
+        console.log(`⏱️ Total time: ${Math.round(totalTime)}ms`);
+        console.log(`   - Font loading: ${Math.round(fontBytesLoadTime)}ms`);
+        console.log(`   - Generation: ${Math.round(generationTime)}ms`);
 
-        if (abTestManager) {
-            abTestManager.trackEvent('pdf-optimization', 'pdf-generated', {
+        // Track performance metrics
+        if (window.abTestManager) {
+            window.abTestManager.trackEvent('pdf-optimization', 'pdf-generated', {
                 totalTime: Math.round(totalTime),
                 fontLoadTime: Math.round(fontBytesLoadTime),
                 generationTime: Math.round(generationTime),
@@ -165,11 +177,11 @@ export async function generatePDFOptimized(batchData: any, options: any = {}): P
         }
 
         return result;
-    } catch (error: any) {
+    } catch (error) {
         console.error('PDF generation failed:', error);
-
-        if (abTestManager) {
-            abTestManager.trackEvent('pdf-optimization', 'pdf-generation-failed', {
+        
+        if (window.abTestManager) {
+            window.abTestManager.trackEvent('pdf-optimization', 'pdf-generation-failed', {
                 error: error.message
             });
         }
@@ -181,15 +193,15 @@ export async function generatePDFOptimized(batchData: any, options: any = {}): P
 /**
  * Benchmark PDF generation performance
  */
-export async function benchmarkPDFGeneration(batchData: any): Promise<{ iterations: number; averageDuration: number; results: any[] }> {
+export async function benchmarkPDFGeneration(batchData) {
     const iterations = 3;
-    const results: any[] = [];
+    const results = [];
 
     console.log('🏁 Starting PDF generation benchmark...');
 
     for (let i = 0; i < iterations; i++) {
         const startTime = performance.now();
-
+        
         try {
             await generatePDFOptimized(batchData);
             const duration = performance.now() - startTime;
@@ -199,9 +211,11 @@ export async function benchmarkPDFGeneration(batchData: any): Promise<{ iteratio
         }
     }
 
-    const avgDuration = results.length > 0
-        ? results.reduce((sum, r) => sum + r.duration, 0) / results.length
-        : 0;
+    const avgDuration = results.reduce((sum, r) => sum + r.duration, 0) / results.length;
+
+    console.log('📊 Benchmark results:');
+    console.log(`   Average duration: ${Math.round(avgDuration)}ms`);
+    console.log(results);
 
     return {
         iterations,

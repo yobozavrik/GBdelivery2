@@ -20,7 +20,6 @@
         connect-src 'self' https://n8n.dmytrotovstytskyi.online https://generativelanguage.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
     ">
 
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,8 +28,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#4f46e5">
 </head>
 
 <body>
@@ -686,7 +684,10 @@
     <div class="modal-overlay" id="endDayModal">
         <div class="modal-content glassmorphism">
             <h3>Завершити день?</h3>
-            <p>AI згенерує підсумковий звіт на основі всіх операцій за сьогодні.</p>
+            <div id="endDaySummary" class="end-day-summary-container">
+                <!-- Статистика буде додана динамічно -->
+            </div>
+            <p class="end-day-hint">AI згенерує підсумковий звіт на основі всіх операцій за сьогодні.</p>
             <div class="modal-actions">
                 <button class="btn-secondary" id="cancelEndDayBtn">Скасувати</button>
                 <button class="btn-primary" id="confirmEndDayBtn">Згенерувати звіт</button>
@@ -702,6 +703,18 @@
                 <div class="loading-spinner"></div>
                 <p>Генеруємо звіт...</p>
             </div>
+
+            <div class="modal-actions report-actions" style="display: none;">
+                <button id="shareSummaryBtn" class="btn-share glassmorphism" title="Поділитись">
+                    <i data-lucide="share-2"></i>
+                    <span>Поділитись</span>
+                </button>
+                <button id="downloadSummaryBtn" class="btn-download glassmorphism" title="Зберегти PDF">
+                    <i data-lucide="download"></i>
+                    <span>Зберегти PDF</span>
+                </button>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn-secondary" id="closeAiSummaryBtn">Закрити</button>
                 <button class="btn-destructive" id="clearHistoryBtn" style="display: none;">Очистити історію</button>
@@ -777,7 +790,7 @@
     <script type="importmap" src="import-map.json"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <script src="/src/main.ts" type="module"></script>
+    <script src="app.js" type="module"></script>
 </body>
 
 </html>

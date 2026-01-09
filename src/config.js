@@ -2,12 +2,8 @@
 // Provides the SecureConfig class and a shared singleton instance
 
 class SecureConfig {
-    public mode: 'test' | 'production';
-    public N8N_WEBHOOK_URL: string;
-    public GEMINI_API_URL: string | null;
-
     constructor() {
-        this.mode = this.getInitialMode() as 'test' | 'production';
+        this.mode = this.getInitialMode();
         this.N8N_WEBHOOK_URL = this.resolveWebhookUrl();
         // AI прямий доступ вимкнено; розпізнавання здійснюється через n8n
         this.GEMINI_API_URL = null;
@@ -37,7 +33,7 @@ class SecureConfig {
         return this.isTestMode ? this.testWebhookUrl : this.productionProxyUrl;
     }
 
-    setMode(mode: 'test' | 'production') {
+    setMode(mode) {
         const normalized = mode === 'test' ? 'test' : 'production';
         this.mode = normalized;
 
@@ -89,18 +85,20 @@ class SecureConfig {
 
     get unloadingLocations() {
         return [
-            'Героїв Майдану',
-            'Ентузіастів',
             'Бульвар',
+            'Героїв Майдану',
             'Гравітон',
-            'Садова',
-            'Флоріда',
+            'Ентузіастів',
             'Ентузіастів 2 поверх',
+            'Кондитерка',
+            'Пекарня',
             'Піцерія',
             'Руська',
+            'Садова',
             'Склад овочевий',
             'Склад сировини "Трембіта"',
             'Склад№2',
+            'Флоріда',
             'Інше'
         ];
     }
@@ -122,11 +120,19 @@ class SecureConfig {
     }
 
     get receiptProductionWebhookUrl() {
-        return 'https://n8n.dmytrotovstytskyi.online/webhook/receipt-scan';
+        return 'https://n8n.dmytrotovstytskyi.online/webhook/gbdelivery2';
     }
 
     get receiptTestWebhookUrl() {
-        return 'https://n8n.dmytrotovstytskyi.online/webhook-test/receipt-scan';
+        return 'https://n8n.dmytrotovstytskyi.online/webhook-test/gbdelivery2';
+    }
+
+    get aiSummaryProductionWebhookUrl() {
+        return 'https://n8n.dmytrotovstytskyi.online/webhook/gbdelivery2';
+    }
+
+    get aiSummaryTestWebhookUrl() {
+        return 'https://n8n.dmytrotovstytskyi.online/webhook-test/gbdelivery2';
     }
 
     get products() {
@@ -155,7 +161,7 @@ class SecureConfig {
         ];
     }
 
-    isWarehouseProduct(productName: string) {
+    isWarehouseProduct(productName) {
         return this.warehouseProducts.includes(productName);
     }
 }
