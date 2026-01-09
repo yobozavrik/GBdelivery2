@@ -1,24 +1,7 @@
 import { config } from './config.js';
 
 class AppState {
-    screen: string;
-    tab: string;
-    isUnloading: boolean;
-    isDelivery: boolean;
-    selectedStore: string | null;
-    batchItems: any[];
-    editingItemId: string | null;
-    operationType: string | null;
-    uiAdapter: any;
-    selectedFile: File | null;
-    receiptPhotoFile: Blob | File | null;
-    receiptPhotoSource: string | null;
-    recognizedItems: any[];
-    receiptCameraStream: MediaStream | null;
-    editingRecognizedIndex: number | null;
-    currentViewedItem: { storeName: string | null, item: any | null };
-
-    constructor(uiAdapter: any = null) {
+    constructor(uiAdapter = null) {
         this.screen = 'main';
         this.tab = 'purchases';
         this.isUnloading = false;
@@ -37,39 +20,40 @@ class AppState {
         this.receiptCameraStream = null;
         this.editingRecognizedIndex = null;
         this.currentViewedItem = { storeName: null, item: null };
+        this.currentDailyReport = null;
     }
 
     // Setters for new state properties
-    setSelectedFile(file: File | null) {
+    setSelectedFile(file) {
         this.selectedFile = file;
     }
 
-    setReceiptPhoto(file: Blob | File | null, source: string | null) {
+    setReceiptPhoto(file, source) {
         this.receiptPhotoFile = file;
         this.receiptPhotoSource = source;
     }
 
-    setRecognizedItems(items: any[]) {
+    setRecognizedItems(items) {
         this.recognizedItems = items;
     }
 
-    setReceiptCameraStream(stream: MediaStream | null) {
+    setReceiptCameraStream(stream) {
         this.receiptCameraStream = stream;
     }
 
-    setEditingRecognizedIndex(index: number | null) {
+    setEditingRecognizedIndex(index) {
         this.editingRecognizedIndex = index;
     }
 
-    setCurrentViewedItem(storeName: string | null, item: any | null) {
+    setCurrentViewedItem(storeName, item) {
         this.currentViewedItem = { storeName, item };
     }
 
-    setUIAdapter(uiAdapter: any) {
+    setUIAdapter(uiAdapter) {
         this.uiAdapter = uiAdapter;
     }
 
-    addBatchItem(item: any) {
+    addBatchItem(item) {
         if (this.batchItems.length >= 20) {
             throw new Error('Максимум 20 товарів в одній заявці');
         }
@@ -77,7 +61,7 @@ class AppState {
         this.updateUI();
     }
 
-    removeBatchItem(index: number) {
+    removeBatchItem(index) {
         this.batchItems.splice(index, 1);
         this.updateUI();
     }
@@ -91,7 +75,7 @@ class AppState {
         return this.batchItems.length;
     }
 
-    setScreen(screen: string, options: any = {}) {
+    setScreen(screen, options = {}) {
         this.screen = screen;
         if (options.isUnloading !== undefined) this.isUnloading = options.isUnloading;
         if (options.isDelivery !== undefined) this.isDelivery = options.isDelivery;
@@ -101,7 +85,7 @@ class AppState {
         this.updateUI();
     }
 
-    setTab(tab: string) {
+    setTab(tab) {
         this.tab = tab;
         this.updateUI();
     }
@@ -114,7 +98,7 @@ class AppState {
 }
 
 class SecureStorageManager {
-    static async getHistoryItems(): Promise<any[]> {
+    static async getHistoryItems() {
         try {
             const items = await IndexedDBManager.getHistory();
             return items.filter(item => this.validateHistoryItem(item));
@@ -124,7 +108,7 @@ class SecureStorageManager {
         }
     }
 
-    static validateHistoryItem(item: any): boolean {
+    static validateHistoryItem(item) {
         return item && typeof item === 'object'
             && typeof item.id === 'string'
             && typeof item.productName === 'string'
@@ -132,7 +116,7 @@ class SecureStorageManager {
             && typeof item.type === 'string';
     }
 
-    static async addToHistory(item: any): Promise<boolean> {
+    static async addToHistory(item) {
         try {
             if (!this.validateHistoryItem(item)) {
                 throw new Error('Invalid history item');
@@ -146,7 +130,7 @@ class SecureStorageManager {
         }
     }
 
-    static async clearHistory(): Promise<boolean> {
+    static async clearHistory() {
         try {
             await IndexedDBManager.clearHistory();
             return true;
@@ -158,7 +142,7 @@ class SecureStorageManager {
 }
 
 class DraftManager {
-    static async getDraft(storeName: string): Promise<any> {
+    static async getDraft(storeName) {
         try {
             const draft = await IndexedDBManager.get('drafts', storeName);
             return draft || { storeName, items: [], createdAt: new Date().toISOString() };
@@ -168,7 +152,7 @@ class DraftManager {
         }
     }
 
-    static async addItemToDraft(storeName: string, item: any): Promise<any> {
+    static async addItemToDraft(storeName, item) {
         const draft = await this.getDraft(storeName);
 
         if (draft.items.length >= 20) {
@@ -185,12 +169,12 @@ class DraftManager {
         return draft;
     }
 
-    static async removeItemFromDraft(storeName: string, itemId: string): Promise<any> {
+    static async removeItemFromDraft(storeName, itemId) {
         const draft = await this.getDraft(storeName);
 
         if (!draft || !draft.items) return null;
 
-        draft.items = draft.items.filter((item: any) => item.id !== itemId);
+        draft.items = draft.items.filter(item => item.id !== itemId);
         draft.updatedAt = new Date().toISOString();
 
         if (draft.items.length === 0) {
@@ -204,12 +188,12 @@ class DraftManager {
         return draft;
     }
 
-    static async updateItemInDraft(storeName: string, itemId: string, updatedItem: any): Promise<any> {
+    static async updateItemInDraft(storeName, itemId, updatedItem) {
         const draft = await this.getDraft(storeName);
 
         if (!draft || !draft.items) return null;
 
-        const itemIndex = draft.items.findIndex((item: any) => item.id === itemId);
+        const itemIndex = draft.items.findIndex(item => item.id === itemId);
         if (itemIndex === -1) return null;
 
         // Зберігаємо оригінальний ID та timestamp створення
@@ -226,24 +210,24 @@ class DraftManager {
         return draft;
     }
 
-    static async deleteDraft(storeName: string) {
+    static async deleteDraft(storeName) {
         await IndexedDBManager.delete('drafts', storeName);
         await IndexedDBManager.logAction('delete_draft', storeName);
     }
 
-    static async getAllDraftsArray(): Promise<any[]> {
+    static async getAllDraftsArray() {
         const drafts = await IndexedDBManager.getAll('drafts');
-        return (drafts as any[]).map(draft => ({
+        return drafts.map(draft => ({
             storeName: draft.storeName,
             itemCount: draft.items.length,
             createdAt: draft.createdAt,
             updatedAt: draft.updatedAt || draft.createdAt
-        })).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        })).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     }
 }
 
 class PurchaseDraftManager {
-    static async getDraft(locationName: string): Promise<any> {
+    static async getDraft(locationName) {
         try {
             const draft = await IndexedDBManager.get('purchaseDrafts', locationName);
             return draft || { locationName, items: [], createdAt: new Date().toISOString() };
@@ -253,7 +237,7 @@ class PurchaseDraftManager {
         }
     }
 
-    static async addItemToDraft(locationName: string, item: any): Promise<any> {
+    static async addItemToDraft(locationName, item) {
         const draft = await this.getDraft(locationName);
 
         if (draft.items.length >= 20) {
@@ -270,12 +254,12 @@ class PurchaseDraftManager {
         return draft;
     }
 
-    static async removeItemFromDraft(locationName: string, itemId: string): Promise<any> {
+    static async removeItemFromDraft(locationName, itemId) {
         const draft = await this.getDraft(locationName);
 
         if (!draft || !draft.items) return null;
 
-        draft.items = draft.items.filter((item: any) => item.id !== itemId);
+        draft.items = draft.items.filter(item => item.id !== itemId);
         draft.updatedAt = new Date().toISOString();
 
         if (draft.items.length === 0) {
@@ -289,12 +273,12 @@ class PurchaseDraftManager {
         return draft;
     }
 
-    static async updateItemInDraft(locationName: string, itemId: string, updatedItem: any): Promise<any> {
+    static async updateItemInDraft(locationName, itemId, updatedItem) {
         const draft = await this.getDraft(locationName);
 
         if (!draft || !draft.items) return null;
 
-        const itemIndex = draft.items.findIndex((item: any) => item.id === itemId);
+        const itemIndex = draft.items.findIndex(item => item.id === itemId);
         if (itemIndex === -1) return null;
 
         updatedItem.id = itemId;
@@ -310,24 +294,24 @@ class PurchaseDraftManager {
         return draft;
     }
 
-    static async deleteDraft(locationName: string): Promise<void> {
+    static async deleteDraft(locationName) {
         await IndexedDBManager.delete('purchaseDrafts', locationName);
         await IndexedDBManager.logAction('delete_purchase_draft', locationName);
     }
 
-    static async getAllDraftsArray(): Promise<any[]> {
+    static async getAllDraftsArray() {
         const drafts = await IndexedDBManager.getAll('purchaseDrafts');
-        return (drafts as any[]).map(draft => ({
+        return drafts.map(draft => ({
             locationName: draft.locationName,
             itemCount: draft.items.length,
             createdAt: draft.createdAt,
             updatedAt: draft.updatedAt || draft.createdAt
-        })).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        })).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     }
 }
 
 class InventoryManager {
-    static async getStock(productName: string, unit: string): Promise<any> {
+    static async getStock(productName, unit) {
         try {
             const key = `${productName}_${unit}`;
             const stock = await IndexedDBManager.get('inventory', key);
@@ -341,7 +325,7 @@ class InventoryManager {
         }
     }
 
-    static async addStock(productName: string, quantity: number, unit: string): Promise<number> {
+    static async addStock(productName, quantity, unit) {
         try {
             const key = `${productName}_${unit}`;
             const stock = await this.getStock(productName, unit);
@@ -359,7 +343,7 @@ class InventoryManager {
         }
     }
 
-    static async removeStock(productName: string, quantity: number, unit: string): Promise<number> {
+    static async removeStock(productName, quantity, unit) {
         try {
             const key = `${productName}_${unit}`;
             const stock = await this.getStock(productName, unit);
@@ -380,7 +364,7 @@ class InventoryManager {
         }
     }
 
-    static async checkAvailability(productName: string, quantity: number, unit: string): Promise<any> {
+    static async checkAvailability(productName, quantity, unit) {
         try {
             if (config.isWarehouseProduct(productName)) {
                 return { available: true, stock: 0 };
@@ -410,7 +394,7 @@ class InventoryManager {
         }
     }
 
-    static async clearDailyStock(): Promise<boolean> {
+    static async clearDailyStock() {
         try {
             await IndexedDBManager.clear('inventory');
             await IndexedDBManager.logAction('clear_inventory', 'Daily inventory cleared');
@@ -425,10 +409,10 @@ class InventoryManager {
 
 class IndexedDBManager {
     static DB_NAME = 'GalaBaluvanaDB';
-    static DB_VERSION = 3;
-    static db: IDBDatabase | null = null;
+    static DB_VERSION = 3; // Увеличена версия для добавления 'cache' store
+    static db = null;
     static isAvailable = false;
-    static cloneFallback(value: any): any {
+    static cloneFallback(value) {
         if (Array.isArray(value)) {
             return [...value];
         }
@@ -440,7 +424,7 @@ class IndexedDBManager {
         return value;
     }
 
-    static safeParseJSON(rawValue: string | null, fallback: any, context = 'localStorage'): any {
+    static safeParseJSON(rawValue, fallback, context = 'localStorage') {
         if (!rawValue) {
             return this.cloneFallback(fallback);
         }
@@ -463,7 +447,7 @@ class IndexedDBManager {
         }
     }
 
-    static async init(): Promise<IDBDatabase | null> {
+    static async init() {
         if (!window.indexedDB) {
             console.warn('⚠️ IndexedDB not available in this browser');
             this.isAvailable = false;
@@ -479,15 +463,15 @@ class IndexedDBManager {
                 reject(request.error);
             };
 
-            request.onsuccess = (event: any) => {
-                this.db = event.target?.result as IDBDatabase;
+            request.onsuccess = () => {
+                this.db = request.result;
                 this.isAvailable = true;
                 console.log('✅ IndexedDB initialized');
                 resolve(this.db);
             };
 
-            request.onupgradeneeded = (event: any) => {
-                const db = event.target.result as IDBDatabase;
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
 
                 if (!db.objectStoreNames.contains('history')) {
                     const historyStore = db.createObjectStore('history', { keyPath: 'id' });
@@ -528,22 +512,19 @@ class IndexedDBManager {
         });
     }
 
-    static getTransaction(storeName: string, mode: IDBTransactionMode = 'readonly'): IDBTransaction {
+    static getTransaction(storeName, mode = 'readonly') {
         if (!this.db) {
             throw new Error('IndexedDB not initialized');
         }
 
         const tx = this.db.transaction(storeName, mode);
-        tx.onabort = (event: any) => {
-            console.error('Transaction abort:', event.target?.error);
-        };
-        tx.onerror = (event: any) => {
-            console.error('Transaction error:', event.target?.error);
+        tx.onerror = (event) => {
+            console.error('Transaction error:', event.target.error);
         };
         return tx;
     }
 
-    static async get(storeName: string, key: any): Promise<any> {
+    static async get(storeName, key) {
         if (!this.isAvailable || !this.db) {
             return this.getFromLocalStorage(storeName, key);
         }
@@ -562,7 +543,7 @@ class IndexedDBManager {
         });
     }
 
-    static async getAll(storeName: string): Promise<any[]> {
+    static async getAll(storeName) {
         if (!this.isAvailable || !this.db) {
             return this.getAllFromLocalStorage(storeName);
         }
@@ -581,7 +562,7 @@ class IndexedDBManager {
         });
     }
 
-    static async put(storeName: string, data: any): Promise<any> {
+    static async put(storeName, data) {
         if (!this.isAvailable || !this.db) {
             return this.saveToLocalStorage(storeName, data);
         }
@@ -600,7 +581,7 @@ class IndexedDBManager {
         });
     }
 
-    static async delete(storeName: string, key: any): Promise<any> {
+    static async delete(storeName, key) {
         if (!this.isAvailable || !this.db) {
             return this.deleteFromLocalStorage(storeName, key);
         }
@@ -619,7 +600,7 @@ class IndexedDBManager {
         });
     }
 
-    static async clear(storeName: string): Promise<any> {
+    static async clear(storeName) {
         if (!this.isAvailable || !this.db) {
             return this.clearLocalStorage(storeName);
         }
@@ -638,25 +619,25 @@ class IndexedDBManager {
         });
     }
 
-    static async getHistory(limit = 100): Promise<any[]> {
+    static async getHistory(limit = 100) {
         const items = await this.getAll('history');
         return items
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
             .slice(0, limit);
     }
 
-    static async addToHistory(item: any): Promise<void> {
+    static async addToHistory(item) {
         if (!item.timestamp) {
             item.timestamp = new Date().toISOString();
         }
         await this.put('history', item);
     }
 
-    static async clearHistory(): Promise<void> {
+    static async clearHistory() {
         await this.clear('history');
     }
 
-    static async logAction(type: string, details: string): Promise<void> {
+    static async logAction(type, details) {
         try {
             const logEntry = {
                 type,
@@ -687,7 +668,7 @@ class IndexedDBManager {
         }
     }
 
-    static async migrateFromLocalStorage(): Promise<void> {
+    static async migrateFromLocalStorage() {
         const history = this.safeParseJSON(localStorage.getItem('delivery_history'), [], 'delivery_history');
         for (const item of history) {
             await this.put('history', item);
@@ -706,11 +687,11 @@ class IndexedDBManager {
         localStorage.setItem('migrated_to_indexeddb', 'true');
     }
 
-    static getLocalStorageKey(storeName: string): string {
+    static getLocalStorageKey(storeName) {
         return `indexeddb_fallback_${storeName}`;
     }
 
-    static getFromLocalStorage(storeName: string, key: any): any {
+    static getFromLocalStorage(storeName, key) {
         const data = this.safeParseJSON(
             localStorage.getItem(this.getLocalStorageKey(storeName)),
             {},
@@ -719,7 +700,7 @@ class IndexedDBManager {
         return data[key] || null;
     }
 
-    static getAllFromLocalStorage(storeName: string): any[] {
+    static getAllFromLocalStorage(storeName) {
         const data = this.safeParseJSON(
             localStorage.getItem(this.getLocalStorageKey(storeName)),
             {},
@@ -728,7 +709,7 @@ class IndexedDBManager {
         return Object.values(data);
     }
 
-    static saveToLocalStorage(storeName: string, value: any): boolean {
+    static saveToLocalStorage(storeName, value) {
         const data = this.safeParseJSON(
             localStorage.getItem(this.getLocalStorageKey(storeName)),
             {},
@@ -744,7 +725,7 @@ class IndexedDBManager {
         return true;
     }
 
-    static deleteFromLocalStorage(storeName: string, key: any): boolean {
+    static deleteFromLocalStorage(storeName, key) {
         const data = this.safeParseJSON(
             localStorage.getItem(this.getLocalStorageKey(storeName)),
             {},
@@ -755,7 +736,7 @@ class IndexedDBManager {
         return true;
     }
 
-    static clearLocalStorage(storeName: string): boolean {
+    static clearLocalStorage(storeName) {
         localStorage.removeItem(this.getLocalStorageKey(storeName));
         return true;
     }

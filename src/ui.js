@@ -1,11 +1,9 @@
 class EventManager {
-    private listeners: Array<{ element: HTMLElement | null, event: string, handler: EventListener }>;
-
     constructor() {
         this.listeners = [];
     }
 
-    add(element: HTMLElement | null, event: string, handler: EventListener): void {
+    add(element, event, handler) {
         if (!element) return;
         element.addEventListener(event, handler);
         this.listeners.push({ element, event, handler });
@@ -18,7 +16,7 @@ class EventManager {
         this.listeners = [];
     }
 
-    remove(element: HTMLElement | null, event: string): void {
+    remove(element, event) {
         this.listeners = this.listeners.filter(listener => {
             if (listener.element === element && listener.event === event) {
                 element?.removeEventListener(event, listener.handler);
@@ -110,7 +108,7 @@ class SkeletonLoader {
         return item;
     }
 
-    static showDraftsSkeleton(container: HTMLElement, count: number = 3): void {
+    static showDraftsSkeleton(container, count = 3) {
         container.innerHTML = '';
         container.style.display = 'flex';
 
@@ -119,7 +117,7 @@ class SkeletonLoader {
         }
     }
 
-    static showDraftItemsSkeleton(container: HTMLElement, count: number = 5): void {
+    static showDraftItemsSkeleton(container, count = 5) {
         container.innerHTML = '';
         container.style.display = 'flex';
 
@@ -128,7 +126,7 @@ class SkeletonLoader {
         }
     }
 
-    static showHistorySkeleton(container: HTMLElement, count: number = 10): void {
+    static showHistorySkeleton(container, count = 10) {
         container.innerHTML = '';
         container.style.display = 'flex';
 
@@ -139,7 +137,7 @@ class SkeletonLoader {
 }
 
 class AnimationManager {
-    static animateScreenTransition(fromScreen: HTMLElement | null, toScreen: HTMLElement | null, isBack: boolean = false): Promise<void> {
+    static animateScreenTransition(fromScreen, toScreen, isBack = false) {
         return new Promise((resolve) => {
             if (!fromScreen || !toScreen) {
                 resolve();
@@ -165,14 +163,14 @@ class AnimationManager {
         });
     }
 
-    static fadeIn(element: HTMLElement): void {
+    static fadeIn(element) {
         element.classList.add('screen-fade-in');
         setTimeout(() => {
             element.classList.remove('screen-fade-in');
         }, 300);
     }
 
-    static fadeOut(element: HTMLElement): Promise<void> {
+    static fadeOut(element) {
         return new Promise((resolve) => {
             element.classList.add('screen-fade-out');
             setTimeout(() => {
@@ -182,56 +180,34 @@ class AnimationManager {
         });
     }
 
-    static animateListItems(container: HTMLElement): void {
+    static animateListItems(container) {
         const items = container.children;
         Array.from(items).forEach((item, index) => {
             if (index < 10) {
-                (item as HTMLElement).classList.add('list-item-animated');
+                item.classList.add('list-item-animated');
                 setTimeout(() => {
-                    (item as HTMLElement).classList.remove('list-item-animated');
+                    item.classList.remove('list-item-animated');
                 }, 300 + (index * 50));
             }
         });
     }
 
-    static animateButtonPress(button: HTMLElement): void {
+    static animateButtonPress(button) {
         button.classList.add('button-press');
-        this.hapticFeedback(10);
         setTimeout(() => {
             button.classList.remove('button-press');
         }, 200);
     }
-
-    static hapticFeedback(pattern: number | number[] = 10): void {
-        if ('vibrate' in navigator) {
-            try {
-                navigator.vibrate(pattern);
-            } catch (e) { }
-        }
-    }
 }
 
 class ToastManager {
-    private queue: Array<{ message: string, type: string }>;
-    private isShowing: boolean;
-
     constructor() {
         this.queue = [];
         this.isShowing = false;
     }
 
-    show(message: string, type: string = 'success'): void {
+    show(message, type = 'success') {
         this.queue.push({ message, type });
-
-        // Haptic feedback based on type
-        if (type === 'error') {
-            AnimationManager.hapticFeedback([50, 30, 50]);
-        } else if (type === 'success') {
-            AnimationManager.hapticFeedback(20);
-        } else {
-            AnimationManager.hapticFeedback(10);
-        }
-
         if (!this.isShowing) {
             this.showNext();
         }
@@ -244,11 +220,8 @@ class ToastManager {
         }
 
         this.isShowing = true;
-        const item = this.queue.shift();
-        if (!item) return;
-        const { message, type } = item;
+        const { message, type } = this.queue.shift();
         const container = document.getElementById('toastContainer');
-        if (!container) return;
 
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
@@ -280,15 +253,15 @@ class ThemeManager {
         }
     }
 
-    static setTheme(theme: string): void {
+    static setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         this.saveTheme(theme);
 
         const themeIcon = document.querySelector('.theme-icon');
         if (themeIcon) {
             themeIcon.setAttribute('data-lucide', theme === 'light' ? 'moon' : 'sun');
-            if (typeof (window as any).lucide !== 'undefined') {
-                (window as any).lucide.createIcons();
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
             }
         }
     }
@@ -302,7 +275,7 @@ class ThemeManager {
         }
     }
 
-    static saveTheme(theme: string): void {
+    static saveTheme(theme) {
         try {
             localStorage.setItem('theme', theme);
         } catch (error) {
@@ -312,7 +285,7 @@ class ThemeManager {
 }
 
 class AppUIAdapter {
-    update(state: any): void {
+    update(state) {
         requestAnimationFrame(() => {
             this.updateScreens(state);
             this.updateTabs(state);
@@ -321,12 +294,7 @@ class AppUIAdapter {
         });
     }
 
-    updateScreens(state: any): void {
-        const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen && state.screen !== 'loading') {
-            loadingScreen.style.display = 'none';
-        }
-
+    updateScreens(state) {
         const screens = {
             main: document.getElementById('mainScreen'),
             'purchase-form': document.getElementById('purchaseFormScreen'),
@@ -343,36 +311,35 @@ class AppUIAdapter {
         };
 
         Object.keys(screens).forEach(key => {
-            const screen = (screens as any)[key];
-            if (screen) {
-                screen.style.display = state.screen === key ? 'block' : 'none';
+            if (screens[key]) {
+                screens[key].style.display = state.screen === key ? 'block' : 'none';
             }
         });
     }
 
-    updateTabs(state: any): void {
-        document.querySelectorAll('.tab-content').forEach(tab => (tab as HTMLElement).style.display = 'none');
+    updateTabs(state) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
         const activeTab = document.getElementById(`${state.tab}Tab`);
         if (activeTab) activeTab.style.display = 'block';
 
         document.querySelectorAll('.nav-button').forEach(btn => {
-            (btn as HTMLElement).classList.toggle('active', (btn as HTMLElement).dataset.tab === state.tab);
+            btn.classList.toggle('active', btn.dataset.tab === state.tab);
         });
     }
 
-    updateNavigation(state: any): void {
+    updateNavigation(state) {
         const showNav = state.screen === 'main';
         const bottomNav = document.getElementById('bottomNavigation');
         if (bottomNav) bottomNav.style.display = showNav ? 'flex' : 'none';
     }
 
-    updateHeader(state: any): void {
+    updateHeader(state) {
         const backButton = document.getElementById('backButton');
         const headerTitle = document.getElementById('headerTitle');
 
         if (!backButton || !headerTitle) return;
 
-        const screenTitles: { [key: string]: () => string } = {
+        const screenTitles = {
             'purchase-form': () => {
                 if (state.isUnloading && state.selectedStore) {
                     return `Відвантаження → ${state.selectedStore}`;
@@ -381,7 +348,7 @@ class AppUIAdapter {
                     return `Закупка → ${state.selectedStore}`;
                 }
                 return state.isUnloading ? 'Відвантаження' :
-                    state.isDelivery ? 'Доставка' : 'Нова закупівля';
+                       state.isDelivery ? 'Доставка' : 'Нова закупівля';
             },
             'store-selection': () => 'Оберіть магазин',
             'drafts-list': () => 'Чернетки відвантаження',
@@ -405,56 +372,11 @@ class AppUIAdapter {
     }
 }
 
-class PhotoCompressor {
-    static async compress(file: File): Promise<Blob | File> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error('Cannot read file'));
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onerror = () => reject(new Error('Cannot load image'));
-                img.onload = () => {
-                    try {
-                        const MAX_WIDTH = 1024;
-                        const MAX_HEIGHT = 1024;
-                        let { width, height } = img;
-                        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-                            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-                            width = Math.round(width * ratio);
-                            height = Math.round(height * ratio);
-                        }
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) {
-                            reject(new Error('Cannot get canvas context'));
-                            return;
-                        }
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'high';
-                        ctx.drawImage(img, 0, 0, width, height);
-                        canvas.toBlob((blob) => {
-                            if (blob && blob.size < file.size) resolve(blob);
-                            else canvas.toBlob((jpegBlob) => resolve(jpegBlob || file), 'image/jpeg', 0.85);
-                        }, 'image/webp', 0.85);
-                    } catch (error) {
-                        reject(new Error('Compression failed: ' + (error instanceof Error ? error.message : String(error))));
-                    }
-                };
-                img.src = e.target?.result as string;
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-}
-
 export {
     EventManager,
     SkeletonLoader,
     AnimationManager,
     ToastManager,
     ThemeManager,
-    AppUIAdapter,
-    PhotoCompressor
+    AppUIAdapter
 };

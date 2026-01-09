@@ -1,35 +1,9 @@
-interface ABTestConfig {
-    name: string;
-    split: number;
-    variantA: string;
-    variantB: string;
-    active: boolean;
-    metadata: Record<string, any>;
-}
+/**
+ * A/B Testing Module
+ * Підтримка A/B тестування для оптимізації продуктивності та UX
+ */
 
-interface ABTestResult {
-    testName: string;
-    variant: string;
-    userId: string;
-    timestamp: number;
-    config: ABTestConfig;
-}
-
-interface ABAnalyticsEvent {
-    testName: string;
-    variant: string;
-    eventName: string;
-    data: Record<string, any>;
-    timestamp: number;
-    userId: string;
-}
-
-export class ABTestManager {
-    private tests: Map<string, ABTestConfig>;
-    private results: Map<string, ABTestResult>;
-    private activeTests: Set<string>;
-    private analytics: ABAnalyticsEvent[];
-
+class ABTestManager {
     constructor() {
         this.tests = new Map();
         this.results = new Map();
@@ -45,13 +19,13 @@ export class ABTestManager {
      * @param {string} config.variantA - Код варіанту A
      * @param {string} config.variantB - Код варіанту B
      */
-    registerTest(testName: string, config: Partial<ABTestConfig>) {
+    registerTest(testName, config) {
         if (this.tests.has(testName)) {
             console.warn(`Test ${testName} already registered`);
             return;
         }
 
-        const testConfig: ABTestConfig = {
+        const testConfig = {
             name: testName,
             split: config.split || 50,
             variantA: config.variantA || 'control',
@@ -72,7 +46,7 @@ export class ABTestManager {
     /**
      * Активація тесту
      */
-    activateTest(testName: string): ABTestResult | null {
+    activateTest(testName) {
         const testConfig = this.tests.get(testName);
         if (!testConfig) {
             console.error(`Test ${testName} not found`);
@@ -90,7 +64,7 @@ export class ABTestManager {
         const variant = this.getVariant(testName, userId);
 
         // Зберігаємо рішення
-        const testResult: ABTestResult = {
+        const testResult = {
             testName,
             variant,
             userId,
@@ -109,7 +83,7 @@ export class ABTestManager {
     /**
      * Отримати активний варіант для тесту
      */
-    getVariant(testName: string, userId: string | null = null): string {
+    getVariant(testName, userId = null) {
         const result = this.results.get(testName);
         if (result) {
             return result.variant;
@@ -135,20 +109,20 @@ export class ABTestManager {
     /**
      * Перевірка, чи активний тест
      */
-    isTestActive(testName: string): boolean {
+    isTestActive(testName) {
         return this.activeTests.has(testName);
     }
 
     /**
      * Відстеження події для аналітики
      */
-    trackEvent(testName: string, eventName: string, data: Record<string, any> = {}) {
+    trackEvent(testName, eventName, data = {}) {
         const result = this.results.get(testName);
         if (!result) {
             return;
         }
 
-        const event: ABAnalyticsEvent = {
+        const event = {
             testName,
             variant: result.variant,
             eventName,
@@ -170,9 +144,9 @@ export class ABTestManager {
     /**
      * Отримати статистику тесту
      */
-    getTestStats(testName: string) {
+    getTestStats(testName) {
         const events = this.analytics.filter(e => e.testName === testName);
-        const grouped: Record<string, Record<string, number>> = {};
+        const grouped = {};
 
         events.forEach(event => {
             if (!grouped[event.variant]) {
@@ -194,11 +168,11 @@ export class ABTestManager {
     /**
      * Допоміжні методи
      */
-    generateUserId(): string {
-        return `user_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    generateUserId() {
+        return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
-    hashCode(str: string): number {
+    hashCode(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
@@ -241,7 +215,7 @@ export function initFormOptimizationTest() {
         split: 50, // 50% користувачів отримають варіант B
         variantA: 'single-page-form',
         variantB: 'wizard-form',
-        active: true,
+        active: false,
         metadata: {
             description: 'Тест крокової форми vs одної великої форми',
             hypothesis: 'Крокова форма зменшить час заповнення на 30%'
@@ -259,7 +233,7 @@ export function initListOptimizationTest() {
         split: 30, // 30% користувачів отримають варіант B
         variantA: 'load-all',
         variantB: 'pagination',
-        active: true,
+        active: false,
         metadata: {
             description: 'Тест pagination vs завантаження всіх елементів',
             hypothesis: 'Pagination зменшить час завантаження на 50%'
@@ -277,7 +251,7 @@ export function initAIScanOptimizationTest() {
         split: 40,
         variantA: 'single-processing',
         variantB: 'batch-processing',
-        active: true,
+        active: false,
         metadata: {
             description: 'Тест batch processing для AI розпізнавання',
             hypothesis: 'Batch processing покращить точність на 15%'
@@ -295,7 +269,7 @@ export function initNavigationOptimizationTest() {
         split: 50,
         variantA: 'default-nav',
         variantB: 'enhanced-nav',
-        active: true,
+        active: false,
         metadata: {
             description: 'Тест покращеної навігації з breadcrumbs',
             hypothesis: 'Pокращена навігація зменшить кількість кліків на 25%'
@@ -313,7 +287,7 @@ export function initPDFOptimizationTest() {
         split: 30,
         variantA: 'full-regeneration',
         variantB: 'cached-generation',
-        active: true,
+        active: false,
         metadata: {
             description: 'Тест кешування шрифтів для PDF',
             hypothesis: 'Кешування зменшить час генерації на 40%'
