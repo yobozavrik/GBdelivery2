@@ -183,6 +183,12 @@ button {
     background-color: var(--muted);
 }
 
+.back-button:focus-visible,
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
 .mode-toggle {
     display: inline-flex;
     align-items: center;
@@ -243,7 +249,8 @@ body.test-mode .app-header {
     flex: 1;
     text-align: center;
     font-size: clamp(1.05rem, 4vw, 1.35rem);
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 
 .main-content {
@@ -302,7 +309,7 @@ body.test-mode .app-header {
 
 .page-header {
     text-align: center;
-    padding: 1.5rem 1rem;
+    padding: 2rem 1rem 1.5rem;
     animation: fadeInUp 0.5s ease-out;
 }
 
@@ -427,12 +434,12 @@ body.test-mode .app-header {
 }
 
 .category-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: var(--shadow-button), 0 0 30px rgba(99, 102, 241, 0.15);
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: var(--shadow-button), 0 0 24px rgba(99, 102, 241, 0.18);
 }
 
 .category-card:active {
-    transform: translateY(-2px) scale(0.98);
+    transform: translateY(-2px) scale(0.99);
 }
 
 .category-card.start-purchase {
@@ -444,7 +451,7 @@ body.test-mode .app-header {
 }
 
 .category-card.start-purchase:hover {
-    transform: translateY(-8px) scale(1.02);
+    transform: translateY(-6px) scale(1.02);
     box-shadow: 0 25px 35px -5px rgb(99 102 241 / 0.3),
         0 10px 15px -8px rgb(99 102 241 / 0.3),
         0 0 40px rgba(99, 102, 241, 0.4);
@@ -1102,7 +1109,7 @@ body.test-mode .app-header {
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(255, 255, 255, 0.8);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-top: 1px solid var(--border);
@@ -1111,11 +1118,11 @@ body.test-mode .app-header {
     padding: 0.5rem 1.25rem calc(0.5rem + var(--safe-bottom));
     max-width: var(--content-max-width);
     margin: 0 auto;
-    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 -6px 12px -6px rgba(0, 0, 0, 0.15);
 }
 
 [data-theme="dark"] .bottom-navigation {
-    background: rgba(15, 23, 42, 0.8);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(15, 23, 42, 0.82) 100%);
 }
 
 .nav-button {
@@ -1131,6 +1138,7 @@ body.test-mode .app-header {
     color: var(--muted-foreground);
     transition: all 0.3s var(--transition-smooth);
     position: relative;
+    border-radius: 0.75rem;
 }
 
 .nav-button::after {
@@ -1156,6 +1164,11 @@ body.test-mode .app-header {
 
 .nav-button.active {
     color: var(--primary);
+}
+
+.nav-button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
 }
 
 .nav-button span {
@@ -1441,12 +1454,12 @@ body.test-mode .app-header {
 }
 
 .store-card:hover {
-    transform: translateY(-8px) scale(1.05);
-    box-shadow: var(--shadow-button), 0 0 25px rgba(99, 102, 241, 0.2);
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: var(--shadow-button), 0 0 24px rgba(99, 102, 241, 0.2);
 }
 
 .store-card:active {
-    transform: translateY(-2px) scale(1.02);
+    transform: translateY(-2px) scale(1.01);
 }
 
 .stores-grid .store-card:nth-child(1) {
@@ -1528,8 +1541,8 @@ body.test-mode .app-header {
 }
 
 .draft-card:hover {
-    transform: translateY(-4px) translateX(4px);
-    box-shadow: var(--shadow-button), 0 0 20px rgba(99, 102, 241, 0.15);
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: var(--shadow-button), 0 0 24px rgba(99, 102, 241, 0.15);
 }
 
 .draft-card-info {
@@ -2666,6 +2679,13 @@ body.test-mode .app-header {
 /* ============================================ */
 /* SKELETON SCREENS - Loading states */
 /* ============================================ */
+
+/* Hide skeleton placeholders entirely (requested) */
+.skeleton,
+[class^="skeleton-"],
+[class*=" skeleton-"] {
+    display: none !important;
+}
 
 /* Base skeleton animation */
 @keyframes skeleton-loading {
