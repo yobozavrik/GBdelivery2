@@ -2680,6 +2680,13 @@ body.test-mode .app-header {
 /* SKELETON SCREENS - Loading states */
 /* ============================================ */
 
+/* Hide skeleton placeholders entirely (requested) */
+.skeleton,
+[class^="skeleton-"],
+[class*=" skeleton-"] {
+    display: none !important;
+}
+
 /* Base skeleton animation */
 @keyframes skeleton-loading {
     0% {
